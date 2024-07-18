@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from utils.database_util import DatabaseUtil, Constants as C
+from utils.database_util import DBUtil, Constants as C
 
 
 class MarketUtil:
@@ -24,9 +24,9 @@ class MarketUtil:
         Initializes the start time, end time, and raw data as None or an empty DataFrame respectively.
         """
 
-        self._start_time = None
-        self._end_time = None
-        self._raw_data = pd.DataFrame({})
+        self.start_time = None
+        self.end_time = None
+        self.raw_data = pd.DataFrame({})
 
     def get_irt(self, start_time: datetime, end_time: datetime) -> pd.DataFrame:
         """
@@ -46,24 +46,24 @@ class MarketUtil:
         forward filled to fill in any missing values,
         and finally filtered to only include rows within the given time period.
         """
-        self._start_time = start_time
-        self._end_time = end_time
+        self.start_time = start_time
+        self.end_time = end_time
 
-        if self._start_time > self._end_time:
+        if self.start_time > self.end_time:
             return pd.DataFrame({})
 
-        _sql = "select * from fm_da.market_irt mi"
+        sql = "select * from fm_da.market_irt mi"
 
-        self._raw_data = DatabaseUtil().execute_query(_sql)
+        self.raw_data = DBUtil().create_conn().query(sql)
         # Fill in any missing dates in the DataFrame
-        self._raw_data = self._raw_data.set_index(C.DATE).resample('D').asfreq().reset_index()
+        self.raw_data = self.raw_data.set_index(C.DATE).resample('D').asfreq().reset_index()
         # Forward fill to fill in any missing values
-        self._raw_data.ffill(inplace=True)
+        self.raw_data.ffill(inplace=True)
         # Filter the DataFrame to only include rows within the given time period
-        mask = (self._raw_data[C.DATE] >= pd.to_datetime(self._start_time)) & (
-                self._raw_data[C.DATE] <= pd.to_datetime(self._end_time))
+        mask = (self.raw_data[C.DATE] >= pd.to_datetime(self.start_time)) & (
+                self.raw_data[C.DATE] <= pd.to_datetime(self.end_time))
 
-        return self._raw_data.loc[mask]
+        return self.raw_data.loc[mask]
 
 
 if __name__ == '__main__':

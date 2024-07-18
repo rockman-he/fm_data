@@ -75,6 +75,7 @@ if repo_everyday.empty:
 else:
 
     # 关联资金市场利率
+    # TODO 重构，1. 引入一个专门用于控制界面控件交互的中间类(Mediator)来降低界面控件之间的耦合度。2. 用tranaction接口来获取数据
     market_irt = market.get_irt(start_time, end_time)
     repo_everyday = pd.merge(repo_everyday, market_irt, left_on=C.AS_DT, right_on=C.DATE, how='left')
 

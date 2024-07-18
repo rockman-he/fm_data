@@ -2,6 +2,8 @@
 # CreateTime: 2024/7/15
 # FileName: database_util
 # Description: This module provides utility functions for database operations.
+# from abc import ABCMeta, abstractmethod
+from typing import Dict
 
 import streamlit as st
 
@@ -13,7 +15,7 @@ class Constants:
 
     # ------------------------数据仓库字段------------------------
     # Database connection name
-    DATABASE_NAME = 'upsrod'
+    COMP_DBNAME = 'upsrod'
     # 成交单编号
     TRADE_NO = 'execid'
     # 期限种类
@@ -76,59 +78,30 @@ class Constants:
     WEIGHT_RATE = 'weight_rate'
 
 
-class DatabaseUtil:
+class DBUtil:
     """
-    This class is used to handle database connections and queries.
+    This class is used to manage database connections. It uses the Borg design pattern to share state across instances.
     """
+    __shared_state: Dict[str, st.connection] = {}  # Shared state across instances
 
-    # A class variable to hold the database connection object.
-    __conn = None
-
-    def __init__(self, db_name=Constants.DATABASE_NAME):
+    def __init__(self) -> None:
         """
-        Constructor for the DatabaseUtil class.
+        Constructor method. It assigns the shared state to the instance's dictionary.
+        """
+        self.__dict__ = self.__shared_state
+
+    def create_conn(self, db_name=Constants.COMP_DBNAME) -> st.connection:
+        """
+        This method creates a new database connection if it doesn't exist and returns it.
+        If the connection already exists, it simply returns the existing connection.
 
         Args:
-            db_name (str): The name of the database to connect to. Defaults to Constants.DATABASE_NAME.
-
-        If a connection has not been established yet, it calls the __get_connection method to establish one.
-        """
-        if DatabaseUtil.__conn is None:
-            DatabaseUtil.__conn = self.__get_connection(db_name)
-
-    @st.cache_resource
-    def __get_connection(_self, db_name) -> st.connection:
-        """
-        Private method to establish a connection to the database.
-
-        Args:
-            db_name (str): The name of the database to connect to.
+            db_name (str): The name of the database. Defaults to Constants.COMP_DBNAME.
 
         Returns:
-            st.connection: A Streamlit connection object.
-
-        This method is decorated with the @st.cache_resource decorator to cache the connection object.
+            st.connection: The database connection.
         """
-        return st.connection(db_name, type='sql', ttl=600)
-
-    @st.cache_data
-    def execute_query(_self, sql) -> st.dataframe:
-        """
-        Method to execute a SQL query on the connected database.
-
-        Args:
-            sql (str): The SQL query to execute.
-
-        Returns:
-            st.dataframe: A Streamlit dataframe object containing the result of the query.
-
-        This method is decorated with the @st.cache_data decorator to cache the result of the query.
-        """
-        return _self.__conn.query(sql)
-
-
-if __name__ == '__main__':
-    db1 = DatabaseUtil()
-    db2 = DatabaseUtil()
-    _sql = "select * from fm_da.market_irt mi where mi.date between \'2023-01-01\' and \'2023-06-01\';"
-    print(db1.execute_query(_sql))
+        if not hasattr(self, db_name):
+            conn = st.connection(db_name, type='sql', ttl=600)
+            setattr(self, db_name, conn)
+        return getattr(self, db_name)
