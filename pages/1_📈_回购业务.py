@@ -7,9 +7,10 @@ import streamlit as st
 from pyecharts.options import LabelOpts
 
 from transaction import Repo
+from utils.display_util import DisplayUtil
 from utils.market_util import MarketUtil
 from utils.time_util import TimeUtil
-from utils.database_util import Constants as C
+from utils.db_util import Constants as C
 
 import streamlit_echarts
 from pyecharts import options as opts
@@ -29,11 +30,6 @@ st.divider()
 # 获取当前月和上个月的时间
 last_month_start = TimeUtil.get_current_and_last_month_dates()[1]
 last_month_end = TimeUtil.get_current_and_last_month_dates()[2]
-
-# 初始化Repo类
-repo = Repo()
-market = MarketUtil()
-repo_everyday = pd.DataFrame({})
 
 # 按时间段查询的form
 with st.form("repo"):
@@ -62,11 +58,21 @@ with st.form("repo"):
 
     repo_submit = st.form_submit_button('查  询')
 
+market = MarketUtil()
+repo_everyday = pd.DataFrame({})
+repo_party = pd.DataFrame({})
+repo_merge = pd.DataFrame({})
+repo_term = pd.DataFrame({})
+
 if repo_submit:
-    repo_everyday = repo.repo_everyday(start_time, end_time, cps_type)
+    repo = Repo(start_time, end_time, cps_type)
+    # print(f"{start_time}{end_time}{cps_type}")
+    repo_everyday = repo.daily_data(start_time, end_time, cps_type)
+    repo_party = repo.party_rank(start_time, end_time, cps_type)
+    repo_merge = DisplayUtil.merge_lastn(repo_party)
+    repo_term = repo.term_type(start_time, end_time, cps_type)
 
 st.divider()
-
 st.markdown("#### 🥇 每日余额利率情况")
 st.write("###  ")
 
@@ -75,7 +81,6 @@ if repo_everyday.empty:
 else:
 
     # 关联资金市场利率
-    # TODO 重构，1. 引入一个专门用于控制界面控件交互的中间类(Mediator)来降低界面控件之间的耦合度。2. 用tranaction接口来获取数据
     market_irt = market.get_irt(start_time, end_time)
     repo_everyday = pd.merge(repo_everyday, market_irt, left_on=C.AS_DT, right_on=C.DATE, how='left')
 
@@ -171,3 +176,146 @@ else:
         theme=ThemeType.WALDEN,
         height='500px'
     )
+
+st.divider()
+st.markdown("#### 🚒 交易对手排名")
+st.markdown(" ")
+
+if repo_party.empty:
+    st.write('无数据')
+else:
+    repo_rank = DisplayUtil.add_total(repo_merge, 0)
+
+    bar_party = (
+        Bar()
+        .add_xaxis(repo_rank[C.MAIN_ORG].values.tolist())
+        .add_yaxis('日均余额(亿元）', (repo_rank[C.AVG_AMT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(), )
+        .add_yaxis(
+            series_name='加权利率（%）',
+            # 采用副坐标
+            yaxis_index=1,
+            y_axis=repo_rank[C.WEIGHT_RATE].apply(lambda x: '%.2f' % x).values.tolist()
+        )
+        # .reversal_axis()
+        .extend_axis(
+            yaxis=opts.AxisOpts(
+                name="",
+                type_="value",
+                min_=0,
+                max_='{:.2f}'.format(repo_everyday[C.WEIGHT_RATE].max() * 2),
+                interval=2,
+                axislabel_opts=opts.LabelOpts(formatter="{value} %"),
+            )
+        )
+        .set_series_opts(label_opts=opts.LabelOpts(position="top"))
+        .set_global_opts(
+            # 以十字交叉坐标指针显示
+            tooltip_opts=opts.TooltipOpts(
+                is_show=True, trigger="axis", axis_pointer_type="cross"
+            ),
+            xaxis_opts=opts.AxisOpts(axislabel_opts=opts.LabelOpts(rotate=-20)),
+        )
+    )
+
+    streamlit_echarts.st_pyecharts(
+        bar_party,
+        theme=ThemeType.WALDEN,
+        height='800px',
+        # width='75%'
+    )
+
+st.divider()
+st.markdown("#### ⛪ 交易对手占比")
+st.markdown(" ")
+
+if repo_party.empty:
+    st.write('无数据')
+else:
+
+    x_pie = repo_merge[C.MAIN_ORG].values.tolist()
+    y_pie = (repo_merge[C.AVG_AMT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist()
+
+    pie_party = (
+        Pie().add(
+            series_name="日均余额",
+            data_pair=[list(z) for z in zip(x_pie, y_pie)],
+            radius=["70%", "90%"],
+            # label_opts=opts.LabelOpts(is_show=True, position="outer"),
+        )
+        .set_global_opts(legend_opts=opts.LegendOpts(pos_left="legft", orient="vertical"))
+        .set_series_opts(
+            # tooltip_opts=opts.TooltipOpts(
+            #     # trigger="item", formatter="{a} <br/>{b}: {c} 亿元 ({d}%)"
+            #     formatter="{c} 亿元 ({d}%)"
+            # ),
+            label_opts=opts.LabelOpts(formatter="{c} 亿元 ({d}%)"),
+        )
+    )
+
+    streamlit_echarts.st_pyecharts(
+        pie_party,
+        theme=ThemeType.WALDEN,
+        # height='800px',
+        # width='50%'
+    )
+
+    with st.expander("交易对手明细(全量）"):
+        # 把“合计”行放置到最后一行
+        repo_all = DisplayUtil.add_total(repo_party)
+
+        if repo_all.empty is False:
+            # 对输出格式化
+
+            repo_all = DisplayUtil.format_output(repo_all)
+
+        st.dataframe(repo_all[[C.MAIN_ORG, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
+                     column_config={
+                         C.MAIN_ORG: '交易对手',
+                         C.AVG_AMT: '日均余额（元）',
+                         C.INST_GROUP: '利息支出',
+                         C.WEIGHT_RATE: '加权利率（%）'
+                     })
+
+st.divider()
+st.markdown("#### 🪟 期限分析")
+st.write("###  ")
+
+if repo_term.empty:
+    st.write('无数据')
+else:
+
+    x_pie = repo_term[C.TERM_TYPE].values.tolist()
+    y_pie = (repo_term[C.AVG_AMT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist()
+
+    pie_term = (
+        Pie().add(
+            series_name="日均余额：",
+            data_pair=[list(z) for z in zip(x_pie, y_pie)],
+            radius=["70%", "90%"],
+        )
+        .set_global_opts(legend_opts=opts.LegendOpts(pos_left="legft", orient="vertical"))
+        .set_series_opts(
+            label_opts=opts.LabelOpts(formatter="{c} 亿元 ({d}%)"),
+        )
+    )
+
+    streamlit_echarts.st_pyecharts(
+        pie_term,
+        theme=ThemeType.WALDEN,
+    )
+
+    with st.expander("期限占比明细"):
+        # 把“合计”行放置到最后一行
+        repo_all = DisplayUtil.add_total(repo_term)
+
+        if repo_all.empty is False:
+            # 对输出格式化
+            repo_all = DisplayUtil.format_output(repo_all)
+
+        st.dataframe(repo_all[[C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
+                     column_config={
+                         C.TERM_TYPE: '期限类别',
+                         C.AVG_AMT: '日均余额（元）',
+                         C.INST_GROUP: '利息支出',
+                         C.WEIGHT_RATE: '加权利率（%）'
+                     })

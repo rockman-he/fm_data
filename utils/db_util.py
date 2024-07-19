@@ -1,10 +1,10 @@
 # Author: RockMan
-# CreateTime: 2024/7/15
-# FileName: database_util
-# Description: This module provides utility functions for database operations.
-# from abc import ABCMeta, abstractmethod
+# CreateTime: 2024/7/19
+# FileName: db.util
+# Description: simple introduction of the code
 from typing import Dict
 
+import pandas as pd
 import streamlit as st
 
 
@@ -74,34 +74,24 @@ class Constants:
     INST_DAYS = 'inst_days'
     # 每天利息
     INST_A_DAY = 'inst_a_day'
+    # 分组后的利息
+    INST_GROUP = 'inst_group'
     # 加权利率
     WEIGHT_RATE = 'weight_rate'
+    # 日均余额
+    AVG_AMT = 'avg_amt'
 
 
-class DBUtil:
+@st.cache_resource
+def create_conn(db=Constants.COMP_DBNAME):
     """
-    This class is used to manage database connections. It uses the Borg design pattern to share state across instances.
+    Create a connection to the database.
+    :param db: Database name
+    :return: Connection object
     """
-    __shared_state: Dict[str, st.connection] = {}  # Shared state across instances
+    return st.connection(db, type='sql', ttl=600)
 
-    def __init__(self) -> None:
-        """
-        Constructor method. It assigns the shared state to the instance's dictionary.
-        """
-        self.__dict__ = self.__shared_state
 
-    def create_conn(self, db_name=Constants.COMP_DBNAME) -> st.connection:
-        """
-        This method creates a new database connection if it doesn't exist and returns it.
-        If the connection already exists, it simply returns the existing connection.
-
-        Args:
-            db_name (str): The name of the database. Defaults to Constants.COMP_DBNAME.
-
-        Returns:
-            st.connection: The database connection.
-        """
-        if not hasattr(self, db_name):
-            conn = st.connection(db_name, type='sql', ttl=600)
-            setattr(self, db_name, conn)
-        return getattr(self, db_name)
+@st.cache_data
+def get_raw(_conn: st.connection, sql: str) -> pd.DataFrame:
+    return _conn.query(sql)
