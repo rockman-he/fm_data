@@ -63,14 +63,36 @@ repo_everyday = pd.DataFrame({})
 repo_party = pd.DataFrame({})
 repo_merge = pd.DataFrame({})
 repo_term = pd.DataFrame({})
+repo_rank = pd.DataFrame({})
+repo_occ = pd.DataFrame({})
 
 if repo_submit:
     repo = Repo(start_time, end_time, cps_type)
-    # print(f"{start_time}{end_time}{cps_type}")
     repo_everyday = repo.daily_data(start_time, end_time, cps_type)
     repo_party = repo.party_rank(start_time, end_time, cps_type)
     repo_merge = DisplayUtil.merge_lastn(repo_party)
+    repo_rank = DisplayUtil.add_total(repo_merge, 0)
     repo_term = repo.term_type(start_time, end_time, cps_type)
+    repo_occ = repo.occ_stats(start_time, end_time, cps_type)
+
+col1, col2, col3 = st.columns(3)
+if repo_party.empty:
+    st.write("无数据")
+else:
+    col1.metric("日均余额（亿元）", '{:,.2f}'.format(repo_rank.loc[0, C.AVG_AMT] / 100000000))
+    col2.metric("加权利率（%）", '{:.4f}'.format(repo_rank.loc[0, C.WEIGHT_RATE]))
+    col3.metric("加权天数", '{:.2f}'.format(repo_merge[C.PRODUCT].sum() / repo_occ[C.TRADE_WEIGHT_SUM]))
+
+    col1.metric("交易笔数", repo_occ[C.TRADE_NUM])
+    col2.metric("最高加权利率（%）", '{:.2f}'.format(repo_everyday[C.WEIGHT_RATE].max()))
+    col3.metric("最高单笔利率（%）", '{:.2f}'.format(repo_occ[C.MAX_RATE] * 100))
+
+    col1.metric("交易金额（亿元）", '{:,.2f}'.format(repo_occ[C.TRADE_SUM] / 100000000))
+    col2.metric("最低加权利率（%）",
+                '{:.2f}'.format(repo_everyday.loc[repo_everyday[C.WEIGHT_RATE] != 0, C.WEIGHT_RATE].min()))
+    col3.metric("最低单笔利率（%）", '{:.2f}'.format(repo_occ[C.MIN_RATE] * 100))
+
+st.divider()
 
 st.divider()
 st.markdown("#### 🥇 每日余额利率情况")
@@ -95,7 +117,7 @@ else:
             # 图例显示
             "日均余额（亿元）",
             # 数据
-            (repo_everyday[C.REPO_AMOUNT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
+            (repo_everyday[C.CASH_AMOUNT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
             # 定义bar柱体的颜色
             color="#37a2da",
             # 显示最高点的值
@@ -184,7 +206,6 @@ st.markdown(" ")
 if repo_party.empty:
     st.write('无数据')
 else:
-    repo_rank = DisplayUtil.add_total(repo_merge, 0)
 
     bar_party = (
         Bar()

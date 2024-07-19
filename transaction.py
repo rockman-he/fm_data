@@ -4,6 +4,7 @@
 # Description: simple introduction of the code
 import datetime
 from abc import ABC, abstractmethod, ABCMeta
+from typing import Dict
 
 import pandas as pd
 import streamlit as st
@@ -47,6 +48,10 @@ class Transaction(ABC, metaclass=ABCMeta):
     def term_type(_self, start_time, end_time, direciton) -> pd.DataFrame:
         raise NotImplementedError
 
+    @abstractmethod
+    def occ_stats(_self, start_time, end_time, direciton) -> pd.DataFrame:
+        raise NotImplementedError
+
 
 class Repo(Transaction):
 
@@ -58,8 +63,8 @@ class Repo(Transaction):
 
         self.direction = '4' if self.direction == '正回购' else '1'
         sql = f"select tc.{C.TRADE_NO}, tc.{C.TERM_TYPE}, tc.{C.COUNTERPARTY}, bar.{C.MAIN_ORG}, " \
-              f"tc.{C.DIRECTION}, tc.{C.REPO_RATE}, tc.{C.CONVERTED_BOND_AMOUNT}, tc.{C.BOND_AMOUNT}, " \
-              f"tc.{C.REPO_AMOUNT}, tc.{C.INTEREST_AMOUNT}, tc.{C.SETTLEMENT_DATE}, tc.{C.MATURITY_DATE}, " \
+              f"tc.{C.DIRECTION}, tc.{C.RATE}, tc.{C.CONVERTED_BOND_AMOUNT}, tc.{C.BOND_AMOUNT}, " \
+              f"tc.{C.CASH_AMOUNT}, tc.{C.INTEREST_AMOUNT}, tc.{C.SETTLEMENT_DATE}, tc.{C.MATURITY_DATE}, " \
               f"tc.{C.CASH_HOLDING_DAYS}, tc.{C.CHECK_STATUS}, tc.{C.TRADER} " \
               f"from upsrod.trade_colrepoes tc " \
               f"left join upsrod.basic_agencies_relation bar " \
@@ -103,7 +108,7 @@ class Repo(Transaction):
         # 统计区间的实际计息天数
         raw[C.WORK_DAYS] = (raw[C.AE_DT] - raw[C.AS_DT]).apply(lambda x: x.days)
         # 积数
-        raw[C.PRODUCT] = raw[C.REPO_AMOUNT] * raw[C.WORK_DAYS]
+        raw[C.PRODUCT] = raw[C.CASH_AMOUNT] * raw[C.WORK_DAYS]
 
         # 统计区间内实际收取的利息，C.INST_DAYS为区间总利息，C.INST_A_DAY为每天的利息
         raw[C.INST_DAYS] = (raw[C.INTEREST_AMOUNT] / raw[C.CASH_HOLDING_DAYS]
@@ -120,13 +125,13 @@ class Repo(Transaction):
 
         date_range = pd.date_range(start=_self.start_time, end=_self.end_time, freq='D')
         repo = pd.DataFrame(date_range, columns=[C.AS_DT])
-        repo[C.REPO_AMOUNT] = 0.0
+        repo[C.CASH_AMOUNT] = 0.0
         repo[C.INST_DAYS] = 0.0
 
         # 遍历数据库查询结果
         for row in _self.raw.index:
             # 回购金额
-            repo_amt = _self.raw.loc[row][C.REPO_AMOUNT]
+            repo_amt = _self.raw.loc[row][C.CASH_AMOUNT]
             # 满足统计区间的起始时间
             as_date = _self.raw.loc[row][C.AS_DT]
             # 满足统计区间的截至时间
@@ -136,10 +141,10 @@ class Repo(Transaction):
 
             # 将起止时间段的回购余额和利息总额进行汇总
             mask = (repo[C.AS_DT] >= as_date) & (repo[C.AS_DT] < ae_date)
-            repo.loc[mask, [C.REPO_AMOUNT]] += repo_amt
+            repo.loc[mask, [C.CASH_AMOUNT]] += repo_amt
             repo.loc[mask, [C.INST_DAYS]] += inst_a_day
 
-        repo[C.WEIGHT_RATE] = repo[C.INST_DAYS] * 365 / repo[C.REPO_AMOUNT] * 100
+        repo[C.WEIGHT_RATE] = repo[C.INST_DAYS] * 365 / repo[C.CASH_AMOUNT] * 100
         repo[C.WEIGHT_RATE] = repo[C.WEIGHT_RATE].fillna(0)
 
         return repo
@@ -154,6 +159,7 @@ class Repo(Transaction):
 
         return repo_rank
 
+    @st.cache_data()
     def term_type(_self, start_time, end_time, direciton) -> pd.DataFrame:
 
         if _self.raw.empty:
@@ -183,10 +189,26 @@ class Repo(Transaction):
         term_type.reset_index(inplace=True)
         return term_type
 
+    @st.cache_data()
+    def occ_stats(_self, start_time, end_time, direciton) -> Dict:
+        if _self.raw.empty:
+            return {}
+
+        mask = ((_self.raw[C.SETTLEMENT_DATE] >= start_time.strftime('%Y-%m-%d')) &
+                (_self.raw[C.MATURITY_DATE] <= end_time.strftime('%Y-%m-%d')))
+        occ_stats = _self.raw[mask]
+
+        return {
+            C.TRADE_NUM: occ_stats.shape[0],
+            C.TRADE_SUM: occ_stats[C.CASH_AMOUNT].sum(),
+            C.TRADE_WEIGHT_SUM: _self.raw[C.CASH_AMOUNT].sum(),
+            C.MAX_RATE: occ_stats[C.RATE].max(),
+            C.MIN_RATE: occ_stats[C.RATE].min()
+        }
+
 
 if __name__ == '__main__':
     s_t = datetime.date(2023, 1, 1)
     e_t = datetime.date(2023, 6, 1)
     repo = Repo(s_t, e_t, '正回购')
-    c = repo.party_rank(0, 0, 0)
-    print(c)
+    print(repo.occ_stats(s_t, e_t, '正回购'))
