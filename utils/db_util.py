@@ -2,7 +2,7 @@
 # CreateTime: 2024/7/19
 # FileName: db.util
 # Description: simple introduction of the code
-from typing import Dict
+# from typing import Dict
 
 import pandas as pd
 import streamlit as st
@@ -22,22 +22,32 @@ class Constants:
     TERM_TYPE = 'securityid'
     # 本方交易员
     TRADER = 'selfquotername'
+    # 机构代码
+    CODE = 'code'
     # 交易对手
     COUNTERPARTY = 'counterparty'
-    # 主机构
+    # 机构简称
+    SHORT_NAME = 'shortname'
+    # 机构全称
+    NAME = 'name'
+    # 主机构，在Repo中标准化为NAME
     MAIN_ORG = 'mastername'
     # 从机构
     SUB_ORG = 'slavename'
     # 交易方向，正回购为4，逆回购为1
     DIRECTION = 'side'
-    # 交易利率
-    RATE = 'reporate'
+    # 回购利率，在Repo中标准化为RATE
+    REPO_RATE = 'reporate'
+    # 拆借利率，在IBO中标准化为RATE
+    IBO_RATE = 'iborate'
     # 折算后券面总额
     CONVERTED_BOND_AMOUNT = 'turnover'
     # 券面总额
     BOND_AMOUNT = 'sumunderlyingqty'
-    # 交易金额
-    CASH_AMOUNT = 'tradecashamt'
+    # 回购交易金额，在Repo中标准化为TRADE_AMT
+    REPO_AMOUNT = 'tradecashamt'
+    # 拆借交易金额，在IBO中标准化为TRADE_AMT
+    IBO_AMOUNT = 'turnover'
     # 利息金额
     INTEREST_AMOUNT = 'accruedinterestamt'
     # 首次结算日
@@ -45,15 +55,17 @@ class Constants:
     # 到期结算日
     MATURITY_DATE = 'settledate2'
     # 实际占款天数
-    CASH_HOLDING_DAYS = 'cashholdingdays'
+    HOLDING_DAYS = 'cashholdingdays'
     # 核对情况
     CHECK_STATUS = 'assignstate'
+
+    # ------------------------自定义市场利率字段------------------------
+
     # 统计起始时间
     AS_DT = 'as_dt'
     # 统计结束时间
     AE_DT = 'ae_dt'
 
-    # ------------------------自定义市场利率字段------------------------
     # 日期
     DATE = 'date'
     # R001
@@ -68,6 +80,8 @@ class Constants:
     # ------------------------自定义中间字段------------------------
     # 统计天数
     WORK_DAYS = 'work_days'
+    # 交易金额
+    TRADE_AMT = 'trade_amt'
     # 积数
     PRODUCT = 'product'
     # 实际收息
@@ -86,6 +100,8 @@ class Constants:
     TRADE_SUM = 'trade_sum'
     # 交易金额（按加权）
     TRADE_WEIGHT_SUM = 'trade_weight'
+    # 利率
+    RATE = 'rate'
     # 最高利率
     MAX_RATE = 'max_rate'
     # 最低利率

@@ -28,24 +28,8 @@ class MarketUtil:
         self.end_time = None
         self.raw = pd.DataFrame({})
 
-    def get_irt(self, start_time: datetime, end_time: datetime) -> pd.DataFrame:
-        """
-        Method to get the Interbank Rate Table (IRT) for a given time period.
+    def get_irt(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
 
-        Args:
-            start_time (datetime): The start of the time period.
-            end_time (datetime): The end of the time period.
-
-        Returns:
-            pd.DataFrame: A DataFrame containing the IRT for the given time period.
-
-        This method first checks if the start time is later than the end time,
-        in which case it returns an empty DataFrame.
-        Otherwise, it executes a SQL query to get the IRT from the 'fm_da.market_irt mi' table.
-        The resulting DataFrame is then resampled to fill in any missing dates,
-        forward filled to fill in any missing values,
-        and finally filtered to only include rows within the given time period.
-        """
         self.start_time = start_time
         self.end_time = end_time
 

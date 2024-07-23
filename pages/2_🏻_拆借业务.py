@@ -1,12 +1,12 @@
 # Author: RockMan
 # CreateTime: 2024/7/15
-# FileName: 1_📈_回购业务.py
-# Description: 用于展示回购交易要素的页面
+# FileName: 1_🏻_拆借业务.py
+# Description: 用于展示拆借交易要素的页面
 import pandas as pd
 import streamlit as st
 from pyecharts.options import LabelOpts
 
-from transaction import Repo
+from transaction import IBO
 from utils.display_util import DisplayUtil
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
@@ -19,38 +19,42 @@ from pyecharts.globals import ThemeType
 from utils.txn_factory import TxnFactory
 
 # set_page_config必须放在开头，不然会报错
-st.set_page_config(page_title="回购业务",
-                   page_icon="📈",
+st.set_page_config(page_title="拆借业务",
+                   page_icon="🏻",
                    layout="wide",
                    # 左边sidebar默认是展开的
                    initial_sidebar_state="expanded")
 
-st.markdown("## 🍳 回购业务")
+st.markdown("## 🍳 拆借业务")
 st.divider()
 
+# 获取当前月和上个月的时间
+# last_month_start = TimeUtil.get_current_and_last_month_dates()[1]
+# last_month_end = TimeUtil.get_current_and_last_month_dates()[2]
+
 # 按时间段查询的form
-with st.form("txn"):
-    txn_start_time, txn_end_time, txn_cps_type = st.columns([1, 1, 3])
-    with txn_start_time:
+with st.form("ibo"):
+    ibo_start_time, ibo_end_time, ibo_cps_type = st.columns([1, 1, 3])
+    with ibo_start_time:
         start_time = st.date_input(
             "⏱起始时间",
             value=TimeUtil.get_current_and_last_month_dates()[1],
             # 要明确每个组件的key，不然会共用一个组件
-            key='txn_start_time'
+            key='ibo_start_time'
         )
 
-    with txn_end_time:
+    with ibo_end_time:
         end_time = st.date_input(
             "⏱结束时间",
             value=TimeUtil.get_current_and_last_month_dates()[2],
-            key='txn_end_time'
+            key='ibo_end_time'
         )
 
-    with txn_cps_type:
+    with ibo_cps_type:
         cps_type = st.selectbox(
             '业务类型',
-            ('正回购', '逆回购'),
-            key='txn_cps_type'
+            ('同业拆入', '同业拆出'),
+            key='ibo_cps_type'
         )
 
     txn_submit = st.form_submit_button('查  询')
@@ -65,7 +69,7 @@ txn_partyn_total = pd.DataFrame({})
 txn_occ = pd.DataFrame({})
 
 if txn_submit:
-    txn = TxnFactory(Repo).create_txn(start_time, end_time, cps_type)
+    txn = TxnFactory(IBO).create_txn(start_time, end_time, cps_type)
     display = DisplayUtil(txn)
 
     txn_daily = display.daily_data()
@@ -76,6 +80,19 @@ if txn_submit:
     txn_term = display.term_rank()
     txn_term_total = display.add_total(txn_term, 1)
     txn_occ = display.occ_stats()
+    # txn_partyn_total = DisplayUtil.add_total(txn_party_n, 0)
+
+    # st.dataframe(txn_daily, use_container_width=True)
+
+#
+# if txn_submit:
+#     txn = Repo(start_time, end_time, cps_type)
+#     txn_daily = txn.daily_data(start_time, end_time, cps_type)
+#     txn_party = txn.party_rank(start_time, end_time, cps_type)
+#     txn_party_n = DisplayUtil.merge_lastn(txn_party)
+#     txn_partyn_total = DisplayUtil.add_total(txn_party_n, 0)
+#     txn_term = txn.term_type(start_time, end_time, cps_type)
+#     txn_occ = txn.occ_stats(start_time, end_time, cps_type)
 
 col1, col2, col3 = st.columns(3)
 if txn_party.empty:
@@ -95,18 +112,12 @@ else:
     col3.metric("最低单笔利率（%）", '{:.2f}'.format(txn_occ[C.MIN_RATE] * 100))
 
 st.divider()
-
-st.divider()
 st.markdown("#### 🥇 每日余额利率情况")
 st.write("###  ")
 
 if txn_daily.empty:
     st.write('无数据')
 else:
-
-    # 关联资金市场利率
-    # market_irt = market.get_irt(start_time, end_time)
-    # txn_daily = pd.merge(txn_daily, market_irt, left_on=C.AS_DT, right_on=C.DATE, how='left')
 
     # 横坐标，时间序列
     x_pie = txn_daily[C.AS_DT].dt.strftime('%Y-%m-%d').values.tolist()
@@ -161,12 +172,12 @@ else:
     )
 
     # 资金市场R001利率曲线
-    line_R001 = (
+    line_shibor_on = (
         Line()
         .add_xaxis(x_pie)
         .add_yaxis(
-            C.R001,
-            txn_daily[C.R001].apply(lambda x: '%.2f' % x).values.tolist(),
+            C.SHIBOR_ON,
+            txn_daily[C.SHIBOR_ON].apply(lambda x: '%.2f' % x).values.tolist(),
             # 使用的 y 轴的 index，在单个图表实例中存在多个 y 轴的时候有用。
             # 因为使用的是副轴，所以为1（从0开始）
             yaxis_index=1,
@@ -178,12 +189,12 @@ else:
     )
 
     # 资金市场R007利率曲线
-    line_R007 = (
+    line_shibor_1w = (
         Line()
         .add_xaxis(x_pie)
         .add_yaxis(
-            C.R007,
-            txn_daily[C.R007].apply(lambda x: '%.2f' % x).values.tolist(),
+            C.SHIBOR_1W,
+            txn_daily[C.SHIBOR_1W].apply(lambda x: '%.2f' % x).values.tolist(),
             # 使用的 y 轴的 index，在单个图表实例中存在多个 y 轴的时候有用。
             # 因为使用的是副轴，所以为1（从0开始）
             yaxis_index=1,
@@ -195,7 +206,7 @@ else:
     )
 
     streamlit_echarts.st_pyecharts(
-        line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),
+        line_amt.overlap(line_irt).overlap(line_shibor_on).overlap(line_shibor_1w),
         # line_amt.overlap(line_irt),
         theme=ThemeType.WALDEN,
         height='500px'
@@ -226,7 +237,7 @@ else:
                 name="",
                 type_="value",
                 min_=0,
-                max_='{:.2f}'.format(txn_daily[C.WEIGHT_RATE].max() * 3),
+                max_='{:.2f}'.format(txn_daily[C.WEIGHT_RATE].max() * 2),
                 interval=2,
                 axislabel_opts=opts.LabelOpts(formatter="{value} %"),
             )
@@ -284,7 +295,7 @@ else:
     )
 
     with st.expander("交易对手明细(全量）"):
-
+        # 把“合计”行放置到最后一行
         if txn_party_total.empty is False:
             # 对输出格式化
             txn_party_total = DisplayUtil.format_output(txn_party_total)
