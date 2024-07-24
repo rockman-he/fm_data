@@ -171,7 +171,7 @@ class Transaction:
 
 class Repo(Transaction):
 
-    # TODO 还缺少买断式回购的统计，同时要补全机构的code
+    # TODO 还缺少买断式回购、交易所回购的统计，同时要补全机构的code
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
         super().__init__(start_time, end_time, direction)
 

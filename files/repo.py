@@ -1,6 +1,6 @@
 # Author: RockMan
 # CreateTime: 2024/7/15
-# FileName: 1_📈_回购业务.py
+# FileName: repo.py
 # Description: 用于展示回购交易要素的页面
 import pandas as pd
 import streamlit as st
@@ -28,6 +28,15 @@ st.set_page_config(page_title="回购业务",
 st.markdown("## 🍳 回购业务")
 st.divider()
 
+txn_daily = pd.DataFrame({})
+txn_party = pd.DataFrame({})
+txn_party_total = pd.DataFrame({})
+txn_party_n = pd.DataFrame({})
+txn_term = pd.DataFrame({})
+txn_term_total = pd.DataFrame({})
+txn_partyn_total = pd.DataFrame({})
+txn_occ = pd.DataFrame({})
+
 # 按时间段查询的form
 with st.form("txn"):
     txn_start_time, txn_end_time, txn_cps_type = st.columns([1, 1, 3])
@@ -54,15 +63,6 @@ with st.form("txn"):
         )
 
     txn_submit = st.form_submit_button('查  询')
-
-txn_daily = pd.DataFrame({})
-txn_party = pd.DataFrame({})
-txn_party_total = pd.DataFrame({})
-txn_party_n = pd.DataFrame({})
-txn_term = pd.DataFrame({})
-txn_term_total = pd.DataFrame({})
-txn_partyn_total = pd.DataFrame({})
-txn_occ = pd.DataFrame({})
 
 if txn_submit:
     txn = TxnFactory(Repo).create_txn(start_time, end_time, cps_type)
