@@ -1,7 +1,7 @@
 # Author: RockMan
 # CreateTime: 2024/7/15
 # FileName: transaction
-# Description: simple introduction of the code
+# Description: This module contains classes for handling transactions.
 import datetime
 from typing import Dict
 
@@ -11,17 +11,26 @@ import streamlit as st
 from utils.db_util import Constants as C, create_conn, get_raw
 
 
-class Transaction:
+class FundTx:
     """
-    This is an abstract base class for all repurchase and lending transactions.
+    This is an abstract base class for repo and ibo transactions.
+
+    Attributes:
+        start_time (datetime.date): The start time of the transaction.
+        end_time (datetime.date): The end time of the transaction.
+        direction (str): The direction of the transaction.
+        inst_base (int): The base for calculating interest.
+        raw (pd.DataFrame): The raw data for the transaction.
     """
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
         """
-        Initialize a Transaction instance.
-        :param start_time:
-        :param end_time:
-        :param direction:
+        Initialize a FundTx instance.
+
+        Args:
+            start_time (datetime.date): The start time of the transaction.
+            end_time (datetime.date): The end time of the transaction.
+            direction (str): The direction of the transaction.
         """
         self.start_time = start_time
         self.end_time = end_time
@@ -30,6 +39,15 @@ class Transaction:
         self.raw = None
 
     def _get_raw_data(self, sql) -> pd.DataFrame:
+        """
+        Retrieve raw data from the database.
+
+        Args:
+            sql (str): The SQL query to execute.
+
+        Returns:
+            pd.DataFrame: The raw data retrieved from the database.
+        """
 
         # 如果用户选择的截至时间晚于起始时间，则返回空df
         if self.start_time > self.end_time:
@@ -71,7 +89,23 @@ class Transaction:
 
     @st.cache_data
     # start_time, end_time, direciton仅为缓存机制用的key
-    def daily_data(_self, start_time, end_time, direciton) -> pd.DataFrame:
+    def daily_data(_self, start_time: datetime.date, end_time: datetime.date, direction: str) -> pd.DataFrame:
+        """
+        Retrieve daily data for the transaction.
+
+        Args:
+            start_time (datetime.date): The start time for retrieving the data.
+            end_time (datetime.date): The end time for retrieving the data.
+            direction (str): The direction of the transaction.
+
+        Returns:
+            pd.DataFrame: The daily data for the transaction.
+        """
+
+        # 仅仅是为了消除参数未用的警告
+        start_time + datetime.timedelta(days=1)
+        end_time + datetime.timedelta(days=1)
+        len(direction)
 
         if _self.raw.empty:
             return pd.DataFrame({})
@@ -104,6 +138,12 @@ class Transaction:
 
     # 交易对手排名
     def party_rank(_self) -> pd.DataFrame:
+        """
+        Rank counterparties based on the transaction data.
+
+        Returns:
+            pd.DataFrame: The counterparty rankings.
+        """
 
         if _self.raw.empty:
             return pd.DataFrame({})
@@ -113,6 +153,12 @@ class Transaction:
         return repo_rank
 
     def term_rank(_self) -> pd.DataFrame:
+        """
+        Rank terms based on the transaction data.
+
+        Returns:
+            pd.DataFrame: The term rankings.
+        """
 
         if _self.raw.empty:
             return pd.DataFrame({})
@@ -120,6 +166,12 @@ class Transaction:
         return _self.__groupby_column(C.TERM_TYPE)
 
     def occ_stats(self) -> Dict:
+        """
+        Calculate statistics for the transaction.
+
+        Returns:
+            Dict: The calculated statistics.
+        """
 
         if self.raw.empty:
             return {}
@@ -129,26 +181,29 @@ class Transaction:
         occ_stats = self.raw[mask]
 
         return {
+            # 交易笔数
             C.TRADE_NUM: occ_stats.shape[0],
+            # 交易总额（按发生）
             C.TRADE_SUM: occ_stats[C.TRADE_AMT].sum(),
+            # 交易金额（按加权）
             C.TRADE_WEIGHT_SUM: self.raw[C.TRADE_AMT].sum(),
+            # 单笔利率(最大）
             C.MAX_RATE: occ_stats[C.RATE].max(),
+            # 单笔利率(最小）
             C.MIN_RATE: occ_stats[C.RATE].min()
         }
 
-    def get_start_time(self) -> datetime.date:
-        return self.start_time
-
-    def get_end_time(self) -> datetime.date:
-        return self.end_time
-
-    def get_direction(self) -> str:
-        return self.direction
-
-    def get_inst_base(self) -> int:
-        return self.inst_base
-
     def __groupby_column(self, column: str) -> pd.DataFrame:
+        """
+        Group the transaction data by a specific column.
+
+        Args:
+            column (str): The column to group by.
+
+        Returns:
+            pd.DataFrame: The grouped data.
+        """
+
         # 按期限类型进行分组
         txn_group = self.raw.groupby(self.raw[column])
         # 利息加总
@@ -169,10 +224,27 @@ class Transaction:
         return term_type
 
 
-class Repo(Transaction):
+class Repo(FundTx):
+    """
+    This class represents a repo transaction.
+
+    Attributes:
+        start_time (datetime.date): The start time of the transaction.
+        end_time (datetime.date): The end time of the transaction.
+        direction (str): The direction of the transaction.
+    """
 
     # TODO 还缺少买断式回购、交易所回购的统计，同时要补全机构的code
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
+        """
+        Initialize a Repo instance.
+
+        Args:
+            start_time (datetime.date): The start time of the transaction.
+            end_time (datetime.date): The end time of the transaction.
+            direction (str): The direction of the transaction.
+        """
+
         super().__init__(start_time, end_time, direction)
 
         self.direction = '4' if self.direction == '正回购' else '1'
@@ -205,7 +277,17 @@ class Repo(Transaction):
 
         self.raw = self._get_raw_data(sql)
 
-    def _get_raw_data(self, sql) -> pd.DataFrame:
+    def _get_raw_data(self, sql: str) -> pd.DataFrame:
+        """
+        Retrieve raw data from the database.
+
+        Args:
+            sql (str): The SQL query to execute.
+
+        Returns:
+            pd.DataFrame: The raw data retrieved from the database.
+        """
+
         raw = super()._get_raw_data(sql)
 
         if raw.empty:
@@ -217,13 +299,19 @@ class Repo(Transaction):
 
         return raw
 
-    def get_raw_test(self):
-        return self.raw
 
-
-class IBO(Transaction):
+class IBO(FundTx):
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
+        """
+        This class represents an IBO transaction.
+
+        Attributes:
+            start_time (datetime.date): The start time of the transaction.
+            end_time (datetime.date): The end time of the transaction.
+            direction (str): The direction of the transaction.
+        """
+
         super().__init__(start_time, end_time, direction)
         self.inst_base = 360
         self.direction = '1' if self.direction == '同业拆入' else '4'
@@ -257,24 +345,34 @@ class IBO(Transaction):
 
         self.raw = self._get_raw_data(sql)
 
-    def _get_raw_data(self, sql) -> pd.DataFrame:
+    def _get_raw_data(self, sql: str) -> pd.DataFrame:
+        """
+        Retrieve raw data from the database.
+
+        Args:
+            sql (str): The SQL query to execute.
+
+        Returns:
+            pd.DataFrame: The raw data retrieved from the database.
+        """
+
         raw1 = super()._get_raw_data(sql)
 
         if raw1.empty:
             return raw1
 
         # 补全拆借业务明细raw1中缺失的code, shortname, name
-        sql_a = f"select distinct " \
-                f"ti.{C.COUNTERPARTY}, " \
-                f"ba.{C.CODE}, " \
-                f"ba.{C.SHORT_NAME}, " \
-                f"ba.{C.NAME} " \
-                f"from {C.COMP_DBNAME}.trade_iboinfos ti " \
-                f"left join {C.COMP_DBNAME}.basic_agencies ba " \
-                f"on ti.{C.COUNTERPARTY} = ba.{C.SHORT_NAME} " \
-                f"where ba.{C.NAME} != '';"
+        sql = f"select distinct " \
+              f"ti.{C.COUNTERPARTY}, " \
+              f"ba.{C.CODE}, " \
+              f"ba.{C.SHORT_NAME}, " \
+              f"ba.{C.NAME} " \
+              f"from {C.COMP_DBNAME}.trade_iboinfos ti " \
+              f"left join {C.COMP_DBNAME}.basic_agencies ba " \
+              f"on ti.{C.COUNTERPARTY} = ba.{C.SHORT_NAME} " \
+              f"where ba.{C.NAME} != '';"
 
-        raw2 = get_raw(create_conn(), sql_a)
+        raw2 = get_raw(create_conn(), sql)
         df_merged = raw1.merge(raw2, on=C.COUNTERPARTY, how='left', suffixes=('_raw1', '_raw2'))
 
         raw1[C.SHORT_NAME] = df_merged[C.SHORT_NAME + '_raw2'].combine_first(df_merged[C.SHORT_NAME + '_raw1'])
@@ -282,9 +380,6 @@ class IBO(Transaction):
         raw1[C.NAME] = df_merged[C.NAME + '_raw2'].combine_first(df_merged[C.NAME + '_raw1'])
 
         return raw1
-
-    def get_raw_test(self):
-        return self.raw
 
 
 if __name__ == '__main__':
