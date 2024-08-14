@@ -1,8 +1,7 @@
 # Author: RockMan
 # CreateTime: 2024/7/19
-# FileName: db.util
-# Description: simple introduction of the code
-# from typing import Dict
+# FileName: db_util
+# Description: This module provides utility functions for database operations.
 
 import pandas as pd
 import streamlit as st
@@ -10,7 +9,7 @@ import streamlit as st
 
 class Constants:
     """
-    This class is used to store constant values.
+    This class is used to store constant values related to database fields and custom fields for projects.
     """
 
     # ------------------------数据仓库字段------------------------
@@ -109,10 +108,11 @@ class Constants:
 
 
 @st.cache_resource
-def create_conn(db=Constants.COMP_DBNAME):
+def create_conn(db=Constants.COMP_DBNAME) -> st.connection:
     """
     Create a connection to the database.
-    :param db: Database name
+
+    :param db: Database name, defaults to 'upsrod'
     :return: Connection object
     """
     return st.connection(db, type='sql', ttl=600)
@@ -120,4 +120,11 @@ def create_conn(db=Constants.COMP_DBNAME):
 
 @st.cache_data
 def get_raw(_conn: st.connection, sql: str) -> pd.DataFrame:
+    """
+    Query raw data from the database.
+
+    :param _conn: Database connection object
+    :param sql: SQL query string
+    :return: DataFrame containing the queried data
+    """
     return _conn.query(sql)

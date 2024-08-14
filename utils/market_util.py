@@ -1,27 +1,28 @@
 # Author: RockMan
 # CreateTime: 2024/7/16
 # FileName: market_util.py
-# Description: This file contains the MarketUtil class which provides methods for handling market-related operations.
-# The class includes methods for initializing the class and retrieving the Interbank Rate Table (IRT)
-# for a given time period.
-# The file is part of a larger project and is authored by RockMan.
+# Description: This module contains the MarketUtil class which provides methods for handling market-related operations.
+
 from datetime import datetime
-
 import pandas as pd
-
 from utils.db_util import Constants as C, create_conn, get_raw
 
 
 class MarketUtil:
     """
-    This class contains static methods for handling market-related operations.
+    A utility class for handling market-related operations.
+
+    Attributes:
+        start_time (datetime.date): The start time for retrieving the Interbank Rate Table (IRT).
+        end_time (datetime.date): The end time for retrieving the IRT.
+        raw (pd.DataFrame): The raw data retrieved from the database.
     """
 
     def __init__(self):
         """
-        Constructor for the MarketUtil class.
+        Initialize a MarketUtil instance.
 
-        Initializes the start time, end time, and raw data as None or an empty DataFrame respectively.
+        The start time, end time, and raw data are initialized as None or an empty DataFrame respectively.
         """
 
         self.start_time = None
@@ -29,6 +30,17 @@ class MarketUtil:
         self.raw = pd.DataFrame({})
 
     def get_irt(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
+
+        """
+        Retrieve the Interbank Rate Table (IRT) for a given time period.
+
+        Args:
+            start_time (datetime.date): The start time for retrieving the IRT.
+            end_time (datetime.date): The end time for retrieving the IRT.
+
+        Returns:
+            pd.DataFrame: The IRT for the given time period.
+        """
 
         self.start_time = start_time
         self.end_time = end_time
@@ -59,6 +71,3 @@ if __name__ == '__main__':
     start_time = datetime(2023, 1, 1)
     end_time = datetime(2023, 6, 1)
     print(market.get_irt(start_time, end_time))
-    # print(f"This month starts on: {this_month_start}")
-    # print(f"Last month starts on: {last_month_start}")
-    # print(f"Last month ends on: {last_month_end}")
