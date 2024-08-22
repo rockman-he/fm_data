@@ -40,15 +40,15 @@ class Constants:
     # 拆借利率，在IBO中标准化为RATE
     IBO_RATE = 'iborate'
     # 折算后券面总额
-    CONVERTED_BOND_AMOUNT = 'turnover'
-    # 券面总额
-    BOND_AMOUNT = 'sumunderlyingqty'
+    CONVERTED_BOND_AMT = 'turnover'
+    # 券面总额（质押）
+    BOND_AMT = 'sumunderlyingqty'
     # 回购交易金额，在Repo中标准化为TRADE_AMT
-    REPO_AMOUNT = 'tradecashamt'
+    REPO_AMT = 'tradecashamt'
     # 拆借交易金额，在IBO中标准化为TRADE_AMT
-    IBO_AMOUNT = 'turnover'
+    IBO_AMT = 'turnover'
     # 利息金额
-    INTEREST_AMOUNT = 'accruedinterestamt'
+    INTEREST_AMT = 'accruedinterestamt'
     # 首次结算日
     SETTLEMENT_DATE = 'settledate'
     # 到期结算日
@@ -57,6 +57,82 @@ class Constants:
     HOLDING_DAYS = 'cashholdingdays'
     # 核对情况
     CHECK_STATUS = 'assignstate'
+    # 结转日期
+    CARRY_DATE = 'carrydate'
+    # 债券名称
+    BOND_NAME = 'bondname'
+    # 债券全程
+    BOND_FULL_NAME = 'secname'
+    # 债券代码
+    BOND_CODE = 'bondkey'
+    # 市场代码
+    MARKET_CODE = 'marketcode'
+    # 债券类型
+    BOND_TYPE = 'l2sectype'
+    # 债券类型（数字）
+    BOND_TYPE_NUM = 'sectype'
+    # 债券发行日
+    ISSUE_DATE = 'issuedate'
+    # 债券到期日
+    MATURITY = 'matdate'
+    # 票面利率（当期）
+    COUPON_RATE_CURRENT = 'cpnrate_current'
+    # 票面利率（发行）
+    COUPON_RATE_ISSUE = 'cpnrate_issue'
+    # 发行量
+    ISSUE_AMT = 'issuesize'
+    # 发行价格
+    ISSUE_PRICE = 'issueprice'
+    # 发行机构
+    ISSUE_ORG = 'issuername'
+    # 债券期限
+    BOND_TERM = 'term'
+    # 持仓面额
+    HOLD_AMT = 'holdfaceamt'
+    # 成本净价
+    COST_NET_PRICE = 'costclnprc'
+    # 估值方式，Mat：到期值，Option：行权值
+    VALUE_TYPE = 'cdctype'
+    # 估值净价
+    VALUE_NET_PRICE = 'suggest_cleanprice_mdl'
+    # 估值全价
+    VALUE_FULL_PRICE = 'suggest_dirtyprice_mdl'
+    # 日初应计利息
+    ACCRUED_INST = 'accruedinterest'
+    # 日终应计利息
+    ACCRUED_INST_END = 'accruedinterestendday'
+    # 估值日期
+    DEAL_DATE = 'dealdate'
+    # 结转类型
+    CARRY_TYPE = 'carrytype'
+    # 利息开始日期
+    INST_START_DATE = 'intereststartdate'
+    # 利息结束日期
+    INST_END_DATE = 'interestenddate'
+    # 计息天数
+    ACCRUAL_DAYS = 'interestdays'
+    # 当期利息总额
+    PERIOD_INST = 'interestamt'
+    # 成交时间
+    TRADE_TIME = 'tradetime'
+    # 净价
+    NET_PRICE = 'clnprc'
+    # 收益率
+    YIELD = 'yield'
+    # 全价
+    FULL_PRICE = 'drtprc'
+    # 券面总额（现券交易）
+    BOND_AMT_CASH = 'lastqty'
+    # 应计利息总额（现券买卖）
+    ACCRUED_INST_CASH = 'totacruamt'
+    # 交易金额（现券买卖）
+    TRADE_AMT = 'tradecashamt'
+    # 结算金额（现券买卖）
+    SETTLE_AMT = 'settlecurramt'
+    # 成交状态
+    TRADE_STATUS = 'status'
+    # 交易加权净价
+    WEIGHT_NET_PRICE = 'tradeweightclnprc'
 
     # ------------------------自定义市场利率字段------------------------
 
@@ -80,7 +156,7 @@ class Constants:
     # 统计天数
     WORK_DAYS = 'work_days'
     # 交易金额
-    TRADE_AMT = 'trade_amt'
+    # TRADE_AMT = 'trade_amt'
     # 积数
     PRODUCT = 'product'
     # 实际收息
@@ -105,6 +181,10 @@ class Constants:
     MAX_RATE = 'max_rate'
     # 最低利率
     MIN_RATE = 'min_rate'
+    # 资本利得
+    CAPITAL_GAINS = 'capital_gains'
+    # 净价浮盈
+    NET_PROFIT = 'net_profit'
 
 
 @st.cache_resource

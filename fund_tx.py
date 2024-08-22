@@ -38,7 +38,7 @@ class FundTx:
         self.inst_base = 365
         self.raw = None
 
-    def _get_raw_data(self, sql) -> pd.DataFrame:
+    def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
         Retrieve raw data from the database.
 
@@ -81,9 +81,9 @@ class FundTx:
         raw[C.PRODUCT] = raw[C.TRADE_AMT] * raw[C.WORK_DAYS]
 
         # 统计区间内实际收取的利息，C.INST_DAYS为区间总利息，C.INST_A_DAY为每天的利息
-        raw[C.INST_DAYS] = (raw[C.INTEREST_AMOUNT] / raw[C.HOLDING_DAYS]
+        raw[C.INST_DAYS] = (raw[C.INTEREST_AMT] / raw[C.HOLDING_DAYS]
                             * raw[C.WORK_DAYS])
-        raw[C.INST_A_DAY] = raw[C.INTEREST_AMOUNT] / raw[C.HOLDING_DAYS]
+        raw[C.INST_A_DAY] = raw[C.INTEREST_AMT] / raw[C.HOLDING_DAYS]
 
         return raw
 
@@ -255,10 +255,10 @@ class Repo(FundTx):
               f"bar.{C.MAIN_ORG} as {C.NAME}, " \
               f"tc.{C.DIRECTION}, " \
               f"tc.{C.REPO_RATE} as {C.RATE}, " \
-              f"tc.{C.CONVERTED_BOND_AMOUNT}, " \
-              f"tc.{C.BOND_AMOUNT}, " \
-              f"tc.{C.REPO_AMOUNT} as {C.TRADE_AMT}, " \
-              f"tc.{C.INTEREST_AMOUNT}, " \
+              f"tc.{C.CONVERTED_BOND_AMT}, " \
+              f"tc.{C.BOND_AMT}, " \
+              f"tc.{C.REPO_AMT} as {C.TRADE_AMT}, " \
+              f"tc.{C.INTEREST_AMT}, " \
               f"tc.{C.SETTLEMENT_DATE}, " \
               f"tc.{C.MATURITY_DATE}, " \
               f"tc.{C.HOLDING_DAYS}, " \
@@ -325,9 +325,9 @@ class IBO(FundTx):
               f"ti.{C.TERM_TYPE}, " \
               f"ti.{C.DIRECTION}," \
               f"ti.{C.IBO_RATE} as {C.RATE}," \
-              f"ti.{C.IBO_AMOUNT} as {C.TRADE_AMT}," \
+              f"ti.{C.IBO_AMT} as {C.TRADE_AMT}," \
               f"ti.{C.HOLDING_DAYS}," \
-              f"ti.{C.INTEREST_AMOUNT}," \
+              f"ti.{C.INTEREST_AMT}," \
               f"ti.{C.SETTLEMENT_DATE}," \
               f"ti.{C.MATURITY_DATE}," \
               f"ti.{C.CHECK_STATUS}," \
