@@ -35,10 +35,10 @@ class WebDataHandler:
 
     def daily_data(self) -> pd.DataFrame:
         """
-        Retrieve daily data for the transaction and merge it with the Interbank Rate Table (IRT).
+        Retrieve holded data for the transaction and merge it with the Interbank Rate Table (IRT).
 
         Returns:
-            pd.DataFrame: The daily data for the transaction merged with the IRT.
+            pd.DataFrame: The holded data for the transaction merged with the IRT.
         """
 
         daily = self.tx.daily_data(self.tx.start_time, self.tx.end_time, self.tx.direction)
@@ -176,12 +176,12 @@ class WebDataHandler:
         """
         Get the transaction header.
 
-        This method retrieves various transaction data and statistics, including daily data, party rankings,
+        This method retrieves various transaction data and statistics, including holded data, party rankings,
         term rankings, and occurrence statistics.
         It then packages these data into a dictionary and returns it.
 
         The returned dictionary has the following structure:
-        - 'daily': The daily data for the transaction.
+        - 'holded': The holded data for the transaction.
         - 'party': The counterparty rankings.
         - 'party_total': The counterparty rankings with a total row added at the end.
         - 'party_n': The top n counterparty rankings.
@@ -204,7 +204,7 @@ class WebDataHandler:
         txn_occ = self.occ_stats()
 
         return {
-            'daily': txn_daily,
+            'holded': txn_daily,
             'party': txn_party,
             'party_total': txn_party_total,
             'party_n': txn_party_n,

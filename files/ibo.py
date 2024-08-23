@@ -72,16 +72,16 @@ else:
     st.write("###  ")
 
     # 拆借业务的日均余额曲线
-    line_amt = line_global(dh['daily'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
+    line_amt = line_global(dh['holded'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
 
     # 拆借业务的加权利率曲线
-    line_irt = line_component(dh['daily'], C.AS_DT, C.WEIGHT_RATE, '加权利率（%）', 'red')
+    line_irt = line_component(dh['holded'], C.AS_DT, C.WEIGHT_RATE, '加权利率（%）', 'red')
 
     # 资金市场Shibor(O/ N)利率曲线
-    line_shibor_on = line_component(dh['daily'], C.AS_DT, C.SHIBOR_ON, C.SHIBOR_ON, 'green')
+    line_shibor_on = line_component(dh['holded'], C.AS_DT, C.SHIBOR_ON, C.SHIBOR_ON, 'green')
 
     # 资金市场Shibor(1W)利率曲线
-    line_shibor_1w = line_component(dh['daily'], C.AS_DT, C.SHIBOR_1W, C.SHIBOR_1W, 'purple')
+    line_shibor_1w = line_component(dh['holded'], C.AS_DT, C.SHIBOR_1W, C.SHIBOR_1W, 'purple')
 
     streamlit_echarts.st_pyecharts(
         line_amt.overlap(line_irt).overlap(line_shibor_on).overlap(line_shibor_1w),

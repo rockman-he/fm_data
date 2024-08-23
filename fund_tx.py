@@ -91,7 +91,7 @@ class FundTx:
     # start_time, end_time, direciton仅为缓存机制用的key
     def daily_data(_self, start_time: datetime.date, end_time: datetime.date, direction: str) -> pd.DataFrame:
         """
-        Retrieve daily data for the transaction.
+        Retrieve holded data for the transaction.
 
         Args:
             start_time (datetime.date): The start time for retrieving the data.
@@ -99,7 +99,7 @@ class FundTx:
             direction (str): The direction of the transaction.
 
         Returns:
-            pd.DataFrame: The daily data for the transaction.
+            pd.DataFrame: The holded data for the transaction.
         """
 
         # 仅仅是为了消除参数未用的警告

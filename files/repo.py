@@ -70,16 +70,16 @@ else:
     st.write("###  ")
 
     # 回购业务的日均余额曲线
-    line_amt = line_global(dh['daily'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
+    line_amt = line_global(dh['holded'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
 
     # 回购业务的加权利率曲线
-    line_irt = line_component(dh['daily'], C.AS_DT, C.WEIGHT_RATE, '加权利率（%）', 'red')
+    line_irt = line_component(dh['holded'], C.AS_DT, C.WEIGHT_RATE, '加权利率（%）', 'red')
 
     # 资金市场R001利率曲线
-    line_R001 = line_component(dh['daily'], C.AS_DT, C.R001, C.R001, 'green')
+    line_R001 = line_component(dh['holded'], C.AS_DT, C.R001, C.R001, 'green')
 
     # 资金市场R007利率曲线
-    line_R007 = line_component(dh['daily'], C.AS_DT, C.R007, C.R007, 'purple')
+    line_R007 = line_component(dh['holded'], C.AS_DT, C.R007, C.R007, 'purple')
 
     streamlit_echarts.st_pyecharts(
         line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),

@@ -19,11 +19,11 @@ def tx_header(datas: Dict) -> None:
     col2.metric("加权利率（%）", '{:.4f}'.format(datas['partyn_total'].loc[0, C.WEIGHT_RATE]))
     col3.metric("加权天数", '{:.2f}'.format(datas['party_n'][C.PRODUCT].sum() / datas['occ'][C.TRADE_WEIGHT_SUM]))
     col1.metric("交易笔数", datas['occ'][C.TRADE_NUM])
-    col2.metric("最高加权利率（%）", '{:.2f}'.format(datas['daily'][C.WEIGHT_RATE].max()))
+    col2.metric("最高加权利率（%）", '{:.2f}'.format(datas['holded'][C.WEIGHT_RATE].max()))
     col3.metric("最高单笔利率（%）", '{:.2f}'.format(datas['occ'][C.MAX_RATE] * 100))
     col1.metric("交易金额（亿元）", '{:,.2f}'.format(datas['occ'][C.TRADE_SUM] / 100000000))
     col2.metric("最低加权利率（%）",
-                '{:.2f}'.format(datas['daily'].loc[datas['daily'][C.WEIGHT_RATE] != 0, C.WEIGHT_RATE].min()))
+                '{:.2f}'.format(datas['holded'].loc[datas['holded'][C.WEIGHT_RATE] != 0, C.WEIGHT_RATE].min()))
     col3.metric("最低单笔利率（%）", '{:.2f}'.format(datas['occ'][C.MIN_RATE] * 100))
 
 

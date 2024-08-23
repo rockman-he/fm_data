@@ -195,7 +195,7 @@ def create_conn(db=Constants.COMP_DBNAME) -> st.connection:
     :param db: Database name, defaults to 'upsrod'
     :return: Connection object
     """
-    return st.connection(db, type='sql', ttl=600)
+    return st.connection(db, type='sql', ttl=600, max_entries=20)
 
 
 @st.cache_data
