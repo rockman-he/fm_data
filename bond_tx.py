@@ -17,7 +17,7 @@ class BondTx:
         self.end_time = end_time
         self.conn = create_conn()
         self.trades = self.bank_trades()
-        self.holded_info = self.holded_bonds()
+        self.holded_info = self.holded_bonds_info()
         self.insts_flow = self.inst_cash_flow_all()
         self.value = self.daily_value_all()
         self.holded = self.daily_holded_all()
@@ -74,16 +74,13 @@ class BondTx:
 
         return raw
 
-    def get_raw(self):
-        return self.raw
-
     def get_holded_bonds(self):
         return self.holded_info
 
     def inst_cash_flow_all(self) -> pd.DataFrame:
 
-        # bond_code_str = ','.join((self.holded_info[C.BOND_CODE]).astype(str).tolist())
         bonds_code_str = ', '.join([f"'{item}'" for item in (self.holded_info[C.BOND_CODE]).tolist()])
+
         sql = f"select " \
               f"bb.{C.BOND_CODE}, " \
               f"bb.{C.BOND_NAME}, " \
@@ -101,8 +98,8 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
-        if raw.empty:
-            return pd.DataFrame({})
+        # if raw.empty:
+        #     return pd.DataFrame({})
 
         return raw
 
@@ -130,11 +127,11 @@ class BondTx:
 
         bond = self.insts_flow.loc[self.insts_flow[C.BOND_CODE] == bond_code]
 
-        # date_range = pd.date_range(start=self.start_time, end=self.end_time, freq='D')
-        # inst_daily = pd.DataFrame(date_range, columns=[C.DATE])
         inst_daily = pd.DataFrame(columns=[C.DATE, C.INST_A_DAY])
-        inst_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE].copy()
 
+        # 取持仓时间段
+        inst_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE].copy()
+        # 补充下缺失的日期
         inst_daily = inst_daily.set_index(C.DATE).resample('D').asfreq().reset_index()
 
         for row in bond.index:
@@ -143,7 +140,7 @@ class BondTx:
                                        freq='D')
             inst_a_day = bond.loc[row][C.PERIOD_INST] / bond.loc[row][C.ACCRUAL_DAYS]
 
-            # 由于计息天数等因素的差异，分时间段赋值
+            # 由于计息天数等因素的差异，根据利息现金流分时间段赋值
             inst_daily.loc[inst_daily[C.DATE].isin(date_range), C.INST_A_DAY] = inst_a_day
 
         return inst_daily
@@ -189,8 +186,7 @@ class BondTx:
               f"bv.{C.BOND_CODE}, " \
               f"bv.{C.BOND_NAME}, " \
               f"bv.{C.VALUE_TYPE}, " \
-              f"bv.{C.VALUE_NET_PRICE}, " \
-              f"bv.{C.VALUE_FULL_PRICE} " \
+              f"bv.{C.VALUE_NET_PRICE} " \
               f"from {C.COMP_DBNAME}.basic_bondvaluations bv " \
               f"where {C.BOND_CODE} in (" + bonds_code_str + ") " + \
               f" and date(bv.{C.DEAL_DATE}) >= '" + \
@@ -201,8 +197,8 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
-        if raw.empty:
-            return pd.DataFrame({})
+        # if raw.empty:
+        #     return pd.DataFrame({})
 
         return raw
 
@@ -236,7 +232,8 @@ class BondTx:
             return value_daily
 
         bond = self.value.loc[self.value[C.BOND_CODE] == bond_code]
-        bond.drop_duplicates(C.DATE, inplace=True)
+        # bond.drop_duplicates(C.DATE, inplace=True)
+        bond = bond.drop_duplicates(C.DATE)
 
         # 非工作日数据缺失，取前一个工作日的估值
         bond = bond.set_index(C.DATE).resample('D').asfreq().reset_index()
@@ -249,6 +246,7 @@ class BondTx:
 
         return value_daily
 
+    # todo 应该要去掉委托投资的持仓
     def daily_holded_all(self) -> pd.DataFrame:
 
         sql = f"select " \
@@ -268,8 +266,8 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
-        if raw.empty:
-            return pd.DataFrame({})
+        # if raw.empty:
+        #     return pd.DataFrame({})
 
         return raw
 
@@ -315,34 +313,32 @@ class BondTx:
         #
         # return holding_daily
 
+    # def bank_trade_infos(_self, bond_code: str) -> pd.DataFrame:
+    #
+    #     sql = f"select " \
+    #           f"tc.{C.SETTLEMENT_DATE} as {C.DATE}, " \
+    #           f"tc.{C.BOND_NAME}, " \
+    #           f"tc.{C.BOND_CODE}, " \
+    #           f"tc.{C.DIRECTION}, " \
+    #           f"tc.{C.NET_PRICE}, " \
+    #           f"tc.{C.YIELD}, " \
+    #           f"tc.{C.FULL_PRICE}, " \
+    #           f"tc.{C.BOND_AMT_CASH}, " \
+    #           f"tc.{C.ACCRUED_INST_CASH}, " \
+    #           f"tc.{C.TRADE_AMT}, " \
+    #           f"tc.{C.SETTLE_AMT} " \
+    #           f"from {C.COMP_DBNAME}.trade_cashbonds tc " \
+    #           f"where tc.{C.BOND_CODE} = '{bond_code}'" + \
+    #           f" and date(tc.{C.TRADE_TIME}) >= '" + \
+    #           _self.start_time.strftime('%Y-%m-%d') + \
+    #           f"' and date(tc.{C.TRADE_TIME}) <= '" + \
+    #           _self.end_time.strftime('%Y-%m-%d') + \
+    #           f"' and tc.{C.CHECK_STATUS} = 1 " \
+    #           f"order by tc.{C.TRADE_TIME};"
+    #
+    #     return _self._get_raw_data(sql)
+
     # todo 此处为二级交易，还没加上一级交易的逻辑，还有交易所的
-
-    @st.cache_data
-    def bank_trade_infos(_self, bond_code: str) -> pd.DataFrame:
-
-        sql = f"select " \
-              f"tc.{C.SETTLEMENT_DATE} as {C.DATE}, " \
-              f"tc.{C.BOND_NAME}, " \
-              f"tc.{C.BOND_CODE}, " \
-              f"tc.{C.DIRECTION}, " \
-              f"tc.{C.NET_PRICE}, " \
-              f"tc.{C.YIELD}, " \
-              f"tc.{C.FULL_PRICE}, " \
-              f"tc.{C.BOND_AMT_CASH}, " \
-              f"tc.{C.ACCRUED_INST_CASH}, " \
-              f"tc.{C.TRADE_AMT}, " \
-              f"tc.{C.SETTLE_AMT} " \
-              f"from {C.COMP_DBNAME}.trade_cashbonds tc " \
-              f"where tc.{C.BOND_CODE} = '{bond_code}'" + \
-              f" and date(tc.{C.TRADE_TIME}) >= '" + \
-              _self.start_time.strftime('%Y-%m-%d') + \
-              f"' and date(tc.{C.TRADE_TIME}) <= '" + \
-              _self.end_time.strftime('%Y-%m-%d') + \
-              f"' and tc.{C.CHECK_STATUS} = 1 " \
-              f"order by tc.{C.TRADE_TIME};"
-
-        return _self._get_raw_data(sql)
-
     def bank_trades(_self) -> pd.DataFrame:
 
         sql = f"select " \
@@ -369,9 +365,8 @@ class BondTx:
 
     def get_capital_gains(self) -> pd.DataFrame:
 
-        # mask = (self.trades[C.DIRECTION] == 4) & (self.trades[C.BOND_CODE] == bond_code)
-        mask = (self.trades[C.DIRECTION] == 4)
         # 只有卖出债券才有资本利得
+        mask = (self.trades[C.DIRECTION] == 4)
         raw = self.trades.loc[mask, [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT]]
 
         if raw.empty:
@@ -380,36 +375,52 @@ class BondTx:
         raw_group = raw.groupby([C.DATE, C.BOND_CODE, C.BOND_NAME]).agg({
             C.BOND_AMT_CASH: lambda x: x.sum(),
             C.TRADE_AMT: lambda x: x.sum(),
-            # C.BOND_CODE: lambda x: x.iloc[0],
         })
 
+        # 当日的交易加权净价
         raw_group[C.WEIGHT_NET_PRICE] = raw_group[C.TRADE_AMT] / raw_group[C.BOND_AMT_CASH] * 100
-        raw_group = pd.merge(raw_group, self.holded[[C.DATE, C.BOND_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
-                             on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
-        #
-        raw_group_none = raw_group.loc[pd.isna(raw_group[C.COST_NET_PRICE]), :]
-        for row in raw_group_none.index:
-            code = raw_group_none.loc[row, C.BOND_CODE]
-            bond = self.holded.loc[self.holded[C.BOND_CODE] == code, [C.DATE, C.COST_NET_PRICE]]
-            mask = bond[C.DATE] < raw_group_none.loc[row, C.DATE]
-            last_value = bond.loc[mask, C.COST_NET_PRICE].tail(1)
-            # mask = self.holded.loc[self.holded[C.BOND_CODE] == code, C.DATE]
-            # print(mask)
-            # previous = self.holded.loc[mask, C.COST_NET_PRICE]
-            # print(previous.iloc[0])
-            raw_group_none.loc[row, C.COST_NET_PRICE] = last_value.iloc[0]
 
-        # print(raw_group_none)
+        # Create a copy of self.holded to avoid modifying the original DataFrame
+        holded_copy = self.holded.copy()
+
+        # add one day from the C.DATE column
+        holded_copy[C.DATE] = holded_copy[C.DATE] + pd.Timedelta(days=1)
+
+        # Merge raw_group with the modified holded_copy
+        raw_group = pd.merge(raw_group, holded_copy[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.COST_NET_PRICE]]
+                             , on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
+
+        # 理论上没有空值，但是源数据库数据有问题，暂时做此处理
+        raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
+
+        # raw_group = pd.merge(raw_group, self.holded[[C.DATE, C.BOND_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
+        #                      on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
         #
-        # # raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.COST_NET_PRICE]], on=C.DATE, how='left')
-        raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.BOND_CODE, C.COST_NET_PRICE]],
-                             on=[C.DATE, C.BOND_CODE], how='left', suffixes=('', '_NONE'))
+        # raw_group_none = raw_group.loc[pd.isna(raw_group[C.COST_NET_PRICE]), :]
         #
-        # print(raw_group)
-        col = C.COST_NET_PRICE + '_NONE'
-        mask = pd.isna(raw_group.loc[:, col])
-        raw_group.loc[~mask, C.COST_NET_PRICE] = raw_group.loc[~mask, col]
+        # if raw_group_none.empty is False:
+        #     for row in raw_group_none.index:
+        #         code = raw_group_none.loc[row, C.BOND_CODE]
+        #         bond = self.holded.loc[self.holded[C.BOND_CODE] == code, [C.DATE, C.COST_NET_PRICE]]
+        #         mask = bond[C.DATE] < raw_group_none.loc[row, C.DATE]
+        #         last_value = bond.loc[mask, C.COST_NET_PRICE].tail(1)
+        #         # mask = self.holded.loc[self.holded[C.BOND_CODE] == code, C.DATE]
+        #         # print(mask)
+        #         # previous = self.holded.loc[mask, C.COST_NET_PRICE]
+        #         # print(previous.iloc[0])
+        #         raw_group_none.loc[row, C.COST_NET_PRICE] = last_value.iloc[0]
         #
+        #     # print(raw_group_none)
+        #     #
+        #     # # raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.COST_NET_PRICE]], on=C.DATE, how='left')
+        #     raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.BOND_CODE, C.COST_NET_PRICE]],
+        #                          on=[C.DATE, C.BOND_CODE], how='left', suffixes=('', '_NONE'))
+        #     #
+        #     # print(raw_group)
+        #     col = C.COST_NET_PRICE + '_NONE'
+        #     mask = pd.isna(raw_group.loc[:, col])
+        #     raw_group.loc[~mask, C.COST_NET_PRICE] = raw_group.loc[~mask, col]
+        # #
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)
 
@@ -439,7 +450,7 @@ class BondTx:
 
         return raw_value
 
-    def holded_bonds(self) -> pd.DataFrame:
+    def holded_bonds_info(self) -> pd.DataFrame:
 
         sql = f"select distinct " \
               f"cc.{C.BOND_NAME}, " \
@@ -467,15 +478,18 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
+        if raw.empty:
+            return pd.DataFrame({})
+
         # 如果当期利率为空，则取发行利率
         mask = pd.isna(raw.loc[:, C.COUPON_RATE_CURRENT])
         raw.loc[mask, C.COUPON_RATE_CURRENT] = raw.loc[mask, C.COUPON_RATE_ISSUE]
 
-        # 由于早期购买的券商收益凭证补全，过滤掉不纳入统计
+        # 由于早期购买的券商收益凭证不全，过滤掉不纳入统计
         mask = pd.isna(raw.loc[:, C.MARKET_CODE])
         return raw.loc[~mask, :]
 
-    def sum_all(self, bond_code: str) -> pd.DataFrame:
+    def sum_all_profits(self, bond_code: str) -> pd.DataFrame:
 
         mask = (self.capital[C.BOND_CODE] == bond_code)
 
@@ -489,10 +503,14 @@ class BondTx:
         if raw1.empty:
             raw[C.CAPITAL_GAINS] = 0
         else:
-            raw = pd.merge(raw, raw1[[C.DATE, C.CAPITAL_GAINS]],
-                           on=C.DATE, how='left')
+            raw = pd.merge(raw, raw1[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.CAPITAL_GAINS]],
+                           on=[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME], how='outer')
             raw[C.CAPITAL_GAINS] = raw[C.CAPITAL_GAINS].fillna(0)
         raw = pd.merge(raw, raw2[[C.DATE, C.INST_A_DAY]], on=C.DATE, how='left')
         raw = pd.merge(raw, raw3[[C.DATE, C.VALUE_NET_PRICE, C.NET_PROFIT]], on=C.DATE, how='left')
+
+        raw.fillna(0, inplace=True)
+
+        raw[C.TOTAL_PROFIT] = raw[C.CAPITAL_GAINS] + raw[C.INST_A_DAY] + raw[C.NET_PROFIT]
 
         return raw

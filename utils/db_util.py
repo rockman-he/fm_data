@@ -185,6 +185,10 @@ class Constants:
     CAPITAL_GAINS = 'capital_gains'
     # 净价浮盈
     NET_PROFIT = 'net_profit'
+    # 前一天的成本净价
+    LAST_COST_NET_PRICE = 'last_cost_net_price'
+    # 总收益
+    TOTAL_PROFIT = 'total_profit'
 
 
 @st.cache_resource
