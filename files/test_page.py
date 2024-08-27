@@ -56,7 +56,7 @@ with st.form("test"):
 if txn_submit:
     txn = BondTx(start_time, end_time)
 
-bond_code = '160017.IB'
+bond_code = '112003012.IB'
 
 if txn is not None:
     st.write('## 债券业务')
@@ -106,13 +106,23 @@ if txn is not None:
     # # df4 = txn.daily_holding(bond_code)
     # # st.dataframe(df4, use_container_width=True)
     # #
+    st.write('一级申购，request_distributions()')
+    st.dataframe(txn.request_distributions())
 
-    st.write('区间内所有交易记录, bank_trades()')
+    st.write('区间内所有银行间交易记录, bank_trades()')
     df8 = txn.bank_trades()
     st.dataframe(df8)
 
+    st.write('区间内所有交易所交易记录, exchange_trades()')
+    df_8 = txn.exchange_trades()
+    st.dataframe(df_8)
+
+    st.write('区间内所有交易记录, get_all_trades()')
+    df_all = txn.get_all_trades()
+    st.dataframe(df_all)
+
     st.write('资本利得, get_capital_gains()')
-    df5 = txn.get_capital_gains()
+    df5 = txn.get_capital_all()
     st.dataframe(df5, use_container_width=True)
     # # #
     st.write('每日利息, get_daily_insts(bond_code)')

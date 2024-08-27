@@ -35,6 +35,8 @@ class Constants:
     SUB_ORG = 'slavename'
     # 交易方向，正回购为4，逆回购为1
     DIRECTION = 'side'
+    # 交易方向（一级）
+    DIRECTION2 = 'dealside'
     # 回购利率，在Repo中标准化为RATE
     REPO_RATE = 'reporate'
     # 拆借利率，在IBO中标准化为RATE
@@ -59,6 +61,8 @@ class Constants:
     CHECK_STATUS = 'assignstate'
     # 结转日期
     CARRY_DATE = 'carrydate'
+    # 交易日期
+    TRADE_DATE = 'tradedate'
     # 债券名称
     BOND_NAME = 'bondname'
     # 债券全程
@@ -117,14 +121,20 @@ class Constants:
     TRADE_TIME = 'tradetime'
     # 净价
     NET_PRICE = 'clnprc'
+    # 净价（一级）
+    NET_PRICE2 = 'cleanprice'
     # 收益率
     YIELD = 'yield'
     # 全价
     FULL_PRICE = 'drtprc'
-    # 券面总额（现券交易）
+    # 券面总额（现券交易，银行间）
     BOND_AMT_CASH = 'lastqty'
-    # 应计利息总额（现券买卖）
+    # 券面总额（现券交易，交易所）
+    BOND_AMT_CASH2 = 'faceamt'
+    # 应计利息总额（现券买卖，银行间）
     ACCRUED_INST_CASH = 'totacruamt'
+    # 应计利息总额（现券买卖，交易所）
+    ACCRUED_INST_CASH2 = 'totalaiamt'
     # 交易金额（现券买卖）
     TRADE_AMT = 'tradecashamt'
     # 结算金额（现券买卖）
@@ -133,6 +143,8 @@ class Constants:
     TRADE_STATUS = 'status'
     # 交易加权净价
     WEIGHT_NET_PRICE = 'tradeweightclnprc'
+    # 组合编号
+    PORTFOLIO_NO = 'portfoliono'
 
     # ------------------------自定义市场利率字段------------------------
 
