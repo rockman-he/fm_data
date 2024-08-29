@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from fund_tx import IBO
-from utils.web_data import WebDataHandler
+from utils.web_data import FundDataHandler
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
 
@@ -58,7 +58,7 @@ dh = {'party': pd.DataFrame({})}
 
 if txn_submit:
     txn = TxFactory(IBO).create_txn(start_time, end_time, cps_type)
-    dh = WebDataHandler(txn).get_txn_header()
+    dh = FundDataHandler(txn).get_txn_header()
 
 if (dh['party']).empty:
     st.write("无数据")
@@ -120,7 +120,7 @@ else:
         # 把“合计”行放置到最后一行
         if dh['party_total'].empty is False:
             # 对输出格式化
-            dh['party_total'] = WebDataHandler.format_output(dh['party_total'])
+            dh['party_total'] = FundDataHandler.format_output(dh['party_total'])
 
         st.dataframe(dh['party_total'][[C.NAME, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
                      column_config={
@@ -147,7 +147,7 @@ else:
     with st.expander("期限占比明细"):
         if dh['term_total'].empty is False:
             # 对输出格式化
-            dh['term_total'] = WebDataHandler.format_output(dh['term_total'])
+            dh['term_total'] = FundDataHandler.format_output(dh['term_total'])
 
         st.dataframe(dh['term_total'][[C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]],
                      use_container_width=True,

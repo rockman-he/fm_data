@@ -95,6 +95,8 @@ class Constants:
     HOLD_AMT = 'holdfaceamt'
     # 成本净价
     COST_NET_PRICE = 'costclnprc'
+    # 成本全价
+    COST_FULL_PRICE = 'costdrtprc'
     # 估值方式，Mat：到期值，Option：行权值
     VALUE_TYPE = 'cdctype'
     # 估值净价
@@ -125,6 +127,8 @@ class Constants:
     NET_PRICE2 = 'cleanprice'
     # 收益率
     YIELD = 'yield'
+    # 收益率不包括净价浮盈
+    YIELD_NO_NET_PROFIT = 'yield_no_net_profit'
     # 全价
     FULL_PRICE = 'drtprc'
     # 券面总额（现券交易，银行间）
@@ -201,6 +205,8 @@ class Constants:
     LAST_COST_NET_PRICE = 'last_cost_net_price'
     # 总收益
     TOTAL_PROFIT = 'total_profit'
+    # 资金占用
+    CAPITAL_OCCUPY = 'capital_occupy'
 
 
 @st.cache_resource

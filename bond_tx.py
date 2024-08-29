@@ -10,59 +10,42 @@ from utils.db_util import get_raw, create_conn
 from utils.db_util import Constants as C
 
 
-class BondTx:
+class SecurityTx:
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         self.start_time = start_time
         self.end_time = end_time
         self.conn = create_conn()
-        self.trades = self.get_all_trades()
-        self.holded_info = self.holded_bonds_info()
-        self.insts_flow = self.inst_cash_flow_all()
-        self.value = self.daily_value_all()
-        self.holded = self.daily_holded_all()
-        self.capital = self.get_capital_all()
-        self.raw = {}
 
-        # sql = f"select " \
-        #       f"cc.{C.CARRY_DATE} as {C.DATE}, " \
-        #       f"cc.{C.BOND_NAME}, " \
-        #       f"cc.{C.BOND_CODE}, " \
-        #       f"cc.{C.MARKET_CODE}, " \
-        #       f"bi.{C.BOND_TYPE}, " \
-        #       f"cc.{C.HOLD_AMT}, " \
-        #       f"cc.{C.COST_NET_PRICE}, " \
-        #       f"bv.{C.VALUE_TYPE}, " \
-        #       f"bv.{C.VALUE_NET_PRICE}, " \
-        #       f"bv.{C.VALUE_FULL_PRICE}, " \
-        #       f"bv.{C.ACCRUED_INST}, " \
-        #       f"bv.{C.ACCRUED_INST_END} " \
-        #       f"from {C.COMP_DBNAME}.core_carrybondholds cc " \
-        #       f"left join {C.COMP_DBNAME}.basic_bondvaluations bv " \
-        #       f"on date(cc.{C.CARRY_DATE}) = date(bv.{C.DEAL_DATE}) and cc.{C.BOND_CODE} = bv.{C.BOND_CODE} " \
-        #       f"left join {C.COMP_DBNAME}.basic_bondbasicinfos bi " \
-        #       f"on cc.{C.BOND_CODE} = bi.{C.BOND_CODE} " \
-        #       f"where date(cc.{C.CARRY_DATE}) >= '" + \
-        #       self.start_time.strftime('%Y-%m-%d') + \
-        #       f"' and date(cc.{C.CARRY_DATE}) <= '" + \
-        #       self.end_time.strftime('%Y-%m-%d') + \
-        #       f"' and cc.{C.CARRY_TYPE} = 3" \
-        #       f" order by cc.{C.CARRY_DATE};"
+        self.trades = self._sum_all_trades()
+        self.holded_info = self._holded_bonds_info()
 
-        # sql = f"select " \
-        #       f"bb.{C.BOND_CODE}, " \
-        #       f"bb.{C.BOND_NAME}, " \
-        #       f"bb.{C.INST_START_DATE}, " \
-        #       f"bb.{C.INST_END_DATE}, " \
-        #       f"bb.{C.ACCRUAL_DAYS}, " \
-        #       f"bb.{C.PERIOD_INST} " \
-        #       f"from {C.COMP_DBNAME}.basic_bondcashflows bb " \
-        #       f"where bb.{C.BOND_CODE} = '160017.IB' " \
-        #       f"and date(bb.{C.INST_END_DATE}) >= '" + \
-        #       self.start_time.strftime('%Y-%m-%d') + \
-        #       f"' and date(bb.{C.INST_START_DATE}) <= '" + \
-        #       self.end_time.strftime('%Y-%m-%d') + "'"
-        #
-        # self.raw = self._get_raw_data(sql)
+        bond_type = self.holded_info[[C.BOND_CODE, C.BOND_TYPE_NUM]]
+
+        self.request = self._request_distributions()
+        self.insts_flow = self._inst_cash_flow_all()
+        self.value = self._daily_value_all()
+        self.holded = self._daily_holded_all()
+        self.capital = self._capital_all()
+
+        if not bond_type.empty:
+
+            if not self.request.empty:
+                self.request = pd.merge(self.request, bond_type, on=C.BOND_CODE, how='left')
+
+            if not self.trades.empty:
+                self.trades = pd.merge(self.trades, bond_type, on=C.BOND_CODE, how='left')
+
+            if not self.insts_flow.empty:
+                self.insts_flow = pd.merge(self.insts_flow, bond_type, on=C.BOND_CODE, how='left')
+
+            if not self.value.empty:
+                self.value = pd.merge(self.value, bond_type, on=C.BOND_CODE, how='left')
+
+            if not self.holded.empty:
+                self.holded = pd.merge(self.holded, bond_type, on=C.BOND_CODE, how='left')
+
+            if not self.capital.empty:
+                self.capital = pd.merge(self.capital, bond_type, on=C.BOND_CODE, how='left')
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         if self.start_time > self.end_time:
@@ -73,10 +56,28 @@ class BondTx:
 
         return raw
 
-    def get_holded_bonds(self) -> pd.DataFrame:
+    def get_holded_bonds_info(self) -> pd.DataFrame:
         return self.holded_info
 
-    def inst_cash_flow_all(self) -> pd.DataFrame:
+    def get_holded_bonds(self) -> pd.DataFrame:
+        return self.holded
+
+    def get_request_distributions(self) -> pd.DataFrame:
+        return self.request
+
+    def get_all_trades(self) -> pd.DataFrame:
+        return self.trades
+
+    def get_inst_cash_flow_all(self) -> pd.DataFrame:
+        return self.insts_flow
+
+    def get_daily_value_all(self) -> pd.DataFrame:
+        return self.value
+
+    def get_capital_all(self) -> pd.DataFrame:
+        return self.capital
+
+    def _inst_cash_flow_all(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time or self.holded_info.empty:
             return pd.DataFrame({})
@@ -100,29 +101,9 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
-        # if raw.empty:
-        #     return pd.DataFrame({})
-
         return raw
 
-    # CD没有利息，处理方式不一样
-    def inst_cash_flow(self, bond_code: str) -> pd.DataFrame:
-
-        # sql = f"select " \
-        #       f"bb.{C.BOND_CODE}, " \
-        #       f"bb.{C.BOND_NAME}, " \
-        #       f"bb.{C.INST_START_DATE}, " \
-        #       f"bb.{C.INST_END_DATE}, " \
-        #       f"bb.{C.ACCRUAL_DAYS}, " \
-        #       f"bb.{C.PERIOD_INST} " \
-        #       f"from {C.COMP_DBNAME}.basic_bondcashflows bb " \
-        #       f"where bb.{C.BOND_CODE} = '{bond_code}' " \
-        #       f"and date(bb.{C.INST_END_DATE}) >= '" + \
-        #       self.start_time.strftime('%Y-%m-%d') + \
-        #       f"' and date(bb.{C.INST_START_DATE}) <= '" + \
-        #       self.end_time.strftime('%Y-%m-%d') + "';"
-        #
-        # raw = self._get_raw_data(sql)
+    def get_inst_flow(self, bond_code: str) -> pd.DataFrame:
 
         if self.insts_flow.empty or (bond_code not in self.insts_flow[C.BOND_CODE].tolist()):
             return pd.DataFrame({})
@@ -147,7 +128,7 @@ class BondTx:
 
         return inst_daily
 
-    def daily_value_all(self) -> pd.DataFrame:
+    def _daily_value_all(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time or self.holded_info.empty:
             return pd.DataFrame({})
@@ -175,31 +156,12 @@ class BondTx:
 
         return raw
 
-    def daily_value(self, bond_code: str) -> pd.DataFrame:
+    def get_daily_value(self, bond_code: str) -> pd.DataFrame:
 
         if (self.start_time > self.end_time or self.holded_info.empty or
                 (bond_code not in self.holded_info[C.BOND_CODE].tolist())):
             return pd.DataFrame({})
 
-        # 由于数据库表对于非工作日没有估值，所以查询的时间区间前后各增加15个工作日，避免数据缺失
-        # sql = f"select " \
-        #       f"bv.{C.DEAL_DATE} as {C.DATE}, " \
-        #       f"bv.{C.BOND_NAME}, " \
-        #       f"bv.{C.BOND_CODE}, " \
-        #       f"bv.{C.VALUE_TYPE}, " \
-        #       f"bv.{C.VALUE_NET_PRICE}, " \
-        #       f"bv.{C.VALUE_FULL_PRICE} " \
-        #       f"from {C.COMP_DBNAME}.basic_bondvaluations bv " \
-        #       f"where bv.{C.BOND_CODE} = '{bond_code}'" + \
-        #       f" and date(bv.{C.DEAL_DATE}) >= '" + \
-        #       (self.start_time - datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
-        #       f"' and date(bv.{C.DEAL_DATE}) <= '" + \
-        #       (self.end_time + datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
-        #       f"' order by bv.{C.DEAL_DATE};"
-        #
-        # raw = self._get_raw_data(sql)
-
-        # date_range = pd.date_range(start=self.start_time, end=self.end_time, freq='D')
         value_daily = pd.DataFrame(columns=[C.DATE])
         value_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE]
 
@@ -223,7 +185,7 @@ class BondTx:
 
         return value_daily
 
-    def daily_holded_all(self) -> pd.DataFrame:
+    def _daily_holded_all(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time or self.holded_info.empty:
             return pd.DataFrame({})
@@ -235,6 +197,7 @@ class BondTx:
               f"cc.{C.BOND_CODE}, " \
               f"cc.{C.MARKET_CODE}, " \
               f"cc.{C.HOLD_AMT}, " \
+              f"cc.{C.COST_FULL_PRICE}, " \
               f"cc.{C.COST_NET_PRICE} " \
               f"from {C.COMP_DBNAME}.core_carrybondholds cc " \
               f"where date(cc.{C.CARRY_DATE}) >= '" + \
@@ -247,12 +210,9 @@ class BondTx:
 
         raw = self._get_raw_data(sql)
 
-        # if raw.empty:
-        #     return pd.DataFrame({})
-
         return raw
 
-    def daily_holded(_self, bond_code: str) -> pd.DataFrame:
+    def daily_holded_bond(_self, bond_code: str) -> pd.DataFrame:
 
         if (_self.start_time > _self.end_time or _self.holded_info.empty or
                 (bond_code not in _self.holded_info[C.BOND_CODE].tolist())):
@@ -262,65 +222,7 @@ class BondTx:
 
         return bond
 
-        # 如果卖空则没有估值，这种情况的处理？
-
-        # date_range = pd.date_range(start=_self.start_time, end=_self.end_time, freq='D')
-        # holding_daily = pd.DataFrame(date_range, columns=[C.DATE])
-        # holding_daily = pd.merge(holding_daily, bond[[C.DATE, C.HOLD_AMT, C.COST_NET_PRICE]], on=C.DATE, how='left')
-        #
-        # holding_daily[C.HOLD_AMT] = holding_daily[C.HOLD_AMT].fillna(0)
-        # holding_daily[C.COST_NET_PRICE] = holding_daily[C.COST_NET_PRICE].ffill()
-        #
-        # # 如果区间中出现卖空的情况，则无持仓的每日持仓成本为上一个持仓日的持仓成本
-        # if pd.isna(holding_daily.loc[0, C.COST_NET_PRICE]):
-        #     sql = f"select " \
-        #           f"cc.{C.CARRY_DATE} as {C.DATE}, " \
-        #           f"cc.{C.COST_NET_PRICE} " \
-        #           f"from {C.COMP_DBNAME}.core_carrybondholds cc " \
-        #           f"where cc.{C.BOND_CODE} = '{bond_code}'" + \
-        #           f" and date(cc.{C.CARRY_DATE}) < '" + \
-        #           _self.start_time.strftime('%Y-%m-%d') + \
-        #           f"' and cc.{C.CARRY_TYPE} = 3 " \
-        #           f"order by cc.{C.CARRY_DATE} desc limit 1;"
-        #
-        #     raw = _self._get_raw_data(sql)
-        #
-        #     # 如果之前没有持仓，则已经是全量数据，直接返回
-        #     if raw.empty:
-        #         return holding_daily
-        #
-        #     last_cost_net_price = raw.loc[0, C.COST_NET_PRICE]
-        #     mask = holding_daily[C.COST_NET_PRICE].isna()
-        #     holding_daily.loc[mask, C.COST_NET_PRICE] = last_cost_net_price
-        #
-        # return holding_daily
-
-    # def bank_trade_infos(_self, bond_code: str) -> pd.DataFrame:
-    #
-    #     sql = f"select " \
-    #           f"tc.{C.SETTLEMENT_DATE} as {C.DATE}, " \
-    #           f"tc.{C.BOND_NAME}, " \
-    #           f"tc.{C.BOND_CODE}, " \
-    #           f"tc.{C.DIRECTION}, " \
-    #           f"tc.{C.NET_PRICE}, " \
-    #           f"tc.{C.YIELD}, " \
-    #           f"tc.{C.FULL_PRICE}, " \
-    #           f"tc.{C.BOND_AMT_CASH}, " \
-    #           f"tc.{C.ACCRUED_INST_CASH}, " \
-    #           f"tc.{C.TRADE_AMT}, " \
-    #           f"tc.{C.SETTLE_AMT} " \
-    #           f"from {C.COMP_DBNAME}.trade_cashbonds tc " \
-    #           f"where tc.{C.BOND_CODE} = '{bond_code}'" + \
-    #           f" and date(tc.{C.TRADE_TIME}) >= '" + \
-    #           _self.start_time.strftime('%Y-%m-%d') + \
-    #           f"' and date(tc.{C.TRADE_TIME}) <= '" + \
-    #           _self.end_time.strftime('%Y-%m-%d') + \
-    #           f"' and tc.{C.CHECK_STATUS} = 1 " \
-    #           f"order by tc.{C.TRADE_TIME};"
-    #
-    #     return _self._get_raw_data(sql)
-
-    def request_distributions(self) -> pd.DataFrame:
+    def _request_distributions(self) -> pd.DataFrame:
         if self.start_time > self.end_time:
             return pd.DataFrame({})
 
@@ -342,15 +244,14 @@ class BondTx:
 
         bonds = self._get_raw_data(sql)
         bonds_group = bonds.groupby([C.DATE, C.BOND_CODE, C.MARKET_CODE, C.DIRECTION, C.BOND_NAME]).agg({
-            # C.MARKET_CODE: lambda x: x.iloc[0],
-            # C.DIRECTION: lambda x: x.iloc[0],
+
             C.NET_PRICE: lambda x: x.iloc[0],
             C.BOND_AMT_CASH: lambda x: x.sum(),
         })
 
         return bonds_group
 
-    def bank_trades(_self) -> pd.DataFrame:
+    def _bank_trades(_self) -> pd.DataFrame:
 
         if _self.start_time > _self.end_time:
             return pd.DataFrame({})
@@ -377,7 +278,7 @@ class BondTx:
 
         return _self._get_raw_data(sql)
 
-    def exchange_trades(self) -> pd.DataFrame:
+    def _exchange_trades(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time:
             return pd.DataFrame({})
@@ -404,17 +305,20 @@ class BondTx:
 
         return self._get_raw_data(sql)
 
-    def get_all_trades(self) -> pd.DataFrame:
+    def _sum_all_trades(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time:
             return pd.DataFrame({})
 
-        bank = self.bank_trades()
-        exchange = self.exchange_trades()
+        bank = self._bank_trades()
+        exchange = self._exchange_trades()
 
-        return pd.concat([bank, exchange], ignore_index=True)
+        if exchange.empty:
+            return bank
+        else:
+            return pd.concat([bank, exchange], ignore_index=True)
 
-    def get_capital_all(self) -> pd.DataFrame:
+    def _capital_all(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time or self.trades.empty:
             return pd.DataFrame({})
@@ -447,35 +351,6 @@ class BondTx:
 
         # 理论上没有空值，但是源数据库数据有问题，暂时做此处理
         raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
-
-        # raw_group = pd.merge(raw_group, self.holded[[C.DATE, C.BOND_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
-        #                      on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
-        #
-        # raw_group_none = raw_group.loc[pd.isna(raw_group[C.COST_NET_PRICE]), :]
-        #
-        # if raw_group_none.empty is False:
-        #     for row in raw_group_none.index:
-        #         code = raw_group_none.loc[row, C.BOND_CODE]
-        #         bond = self.holded.loc[self.holded[C.BOND_CODE] == code, [C.DATE, C.COST_NET_PRICE]]
-        #         mask = bond[C.DATE] < raw_group_none.loc[row, C.DATE]
-        #         last_value = bond.loc[mask, C.COST_NET_PRICE].tail(1)
-        #         # mask = self.holded.loc[self.holded[C.BOND_CODE] == code, C.DATE]
-        #         # print(mask)
-        #         # previous = self.holded.loc[mask, C.COST_NET_PRICE]
-        #         # print(previous.iloc[0])
-        #         raw_group_none.loc[row, C.COST_NET_PRICE] = last_value.iloc[0]
-        #
-        #     # print(raw_group_none)
-        #     #
-        #     # # raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.COST_NET_PRICE]], on=C.DATE, how='left')
-        #     raw_group = pd.merge(raw_group, raw_group_none[[C.DATE, C.BOND_CODE, C.COST_NET_PRICE]],
-        #                          on=[C.DATE, C.BOND_CODE], how='left', suffixes=('', '_NONE'))
-        #     #
-        #     # print(raw_group)
-        #     col = C.COST_NET_PRICE + '_NONE'
-        #     mask = pd.isna(raw_group.loc[:, col])
-        #     raw_group.loc[~mask, C.COST_NET_PRICE] = raw_group.loc[~mask, col]
-        # #
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)
 
@@ -493,19 +368,12 @@ class BondTx:
 
     def get_daily_insts(_self, bond_code: str) -> pd.DataFrame:
 
-        # if (_self.start_time > _self.end_time or _self.holded_info.empty or
-        #         bond_code not in _self.holded_info[C.BOND_CODE].tolist()):
-        #     return pd.DataFrame({})
-        #
-        # mask = (_self.holded[C.BOND_CODE] == bond_code)
-        # raw = _self.holded.loc[mask, :]
-
-        raw = _self.daily_holded(bond_code)
+        raw = _self.daily_holded_bond(bond_code)
 
         if raw.empty:
             return pd.DataFrame({})
 
-        inst = _self.inst_cash_flow(bond_code)
+        inst = _self.get_inst_flow(bond_code)
 
         raw_inst = pd.merge(raw, inst, on=C.DATE, how='left')
         raw_inst[C.INST_A_DAY] = (raw_inst[C.INST_A_DAY] * raw_inst[C.HOLD_AMT] / 100)
@@ -515,19 +383,12 @@ class BondTx:
 
     def get_net_profit(_self, bond_code: str) -> pd.DataFrame:
 
-        # if (_self.start_time > _self.end_time or _self.holded_info.empty or
-        #         bond_code not in _self.holded_info[C.BOND_CODE].tolist()):
-        #     return pd.DataFrame({})
-        #
-        # mask = (_self.holded[C.BOND_CODE] == bond_code)
-        # raw = _self.holded.loc[mask, :]
-
-        raw = _self.daily_holded(bond_code)
+        raw = _self.daily_holded_bond(bond_code)
 
         if raw.empty:
             return pd.DataFrame({})
 
-        value = _self.daily_value(bond_code)
+        value = _self.get_daily_value(bond_code)
 
         raw_value = pd.merge(raw, value, on=C.DATE, how='left')
         raw_value[C.NET_PROFIT] = (raw_value[C.HOLD_AMT] / 100 *
@@ -535,7 +396,7 @@ class BondTx:
 
         return raw_value
 
-    def holded_bonds_info(self) -> pd.DataFrame:
+    def _holded_bonds_info(self) -> pd.DataFrame:
 
         if self.start_time > self.end_time:
             return pd.DataFrame({})
@@ -587,15 +448,11 @@ class BondTx:
         daily_insts = self.get_daily_insts(bond_code)
         net_profit = self.get_net_profit(bond_code)
 
-        bond = self.daily_holded(bond_code).copy()
+        bond = self.daily_holded_bond(bond_code).copy()
         capital = self.get_capital(bond_code)
 
-        # if self.capital.empty is False:
-        #     mask = (self.capital[C.BOND_CODE] == bond_code)
-        #     capital = self.capital.loc[mask, :]
-
         if capital.empty:
-            # bond.loc[:, C.CAPITAL_GAINS] = 0
+
             bond[C.CAPITAL_GAINS] = 0.0
         else:
             bond = pd.merge(bond, capital[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.CAPITAL_GAINS]],
@@ -603,12 +460,58 @@ class BondTx:
             bond[C.CAPITAL_GAINS] = bond[C.CAPITAL_GAINS].fillna(0)
         bond = pd.merge(bond, daily_insts[[C.DATE, C.INST_A_DAY]], on=C.DATE, how='left')
         bond = pd.merge(bond, net_profit[[C.DATE, C.VALUE_NET_PRICE, C.NET_PROFIT]], on=C.DATE, how='left')
+        bond[C.MARKET_CODE] = bond[C.MARKET_CODE].ffill()
 
         # 找出包含缺失值的列
         columns_with_none = bond.columns[bond.isna().any()]
+
         # 对这些列中的缺失值赋值为 0
         bond[columns_with_none] = bond[columns_with_none].astype(float).fillna(0)
         # 计算总收益
         bond[C.TOTAL_PROFIT] = bond[C.CAPITAL_GAINS] + bond[C.INST_A_DAY] + bond[C.NET_PROFIT]
+        # 资金占用
+        bond[C.CAPITAL_OCCUPY] = bond[C.HOLD_AMT] * bond[C.COST_FULL_PRICE] / 100
 
-        return bond
+        mask = (bond[C.DATE] >= pd.to_datetime(self.start_time)) & (bond[C.DATE] <= pd.to_datetime(self.end_time))
+        return bond.loc[mask, :]
+
+
+class CDTx(SecurityTx):
+    def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
+        super().__init__(start_time, end_time)
+
+        if not self.request.empty:
+            self.request = self.request.loc[self.request[C.BOND_TYPE_NUM] == 26, :]
+        if not self.trades.empty:
+            self.trades = self.trades.loc[self.trades[C.BOND_TYPE_NUM] == 26, :]
+        if not self.insts_flow.empty:
+            self.insts_flow = self.insts_flow.loc[self.insts_flow[C.BOND_TYPE_NUM] == 26, :]
+        if not self.value.empty:
+            self.value = self.value.loc[self.value[C.BOND_TYPE_NUM] == 26, :]
+        if not self.holded.empty:
+            self.holded = self.holded.loc[self.holded[C.BOND_TYPE_NUM] == 26, :]
+        if not self.capital.empty:
+            self.capital = self.capital.loc[self.capital[C.BOND_TYPE_NUM] == 26, :]
+
+        if not self.holded_info.empty:
+            self.holded_info = self.holded_info.loc[self.holded_info[C.BOND_TYPE_NUM] == 26, :]
+
+
+class BondTx(SecurityTx):
+    def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
+        super().__init__(start_time, end_time)
+
+        if not self.request.empty:
+            self.request = self.request.loc[self.request[C.BOND_TYPE_NUM] != 26, :]
+        if not self.trades.empty:
+            self.trades = self.trades.loc[self.trades[C.BOND_TYPE_NUM] != 26, :]
+        if not self.insts_flow.empty:
+            self.insts_flow = self.insts_flow.loc[self.insts_flow[C.BOND_TYPE_NUM] != 26, :]
+        if not self.value.empty:
+            self.value = self.value.loc[self.value[C.BOND_TYPE_NUM] != 26, :]
+        if not self.holded.empty:
+            self.holded = self.holded.loc[self.holded[C.BOND_TYPE_NUM] != 26, :]
+        if not self.capital.empty:
+            self.capital = self.capital.loc[self.capital[C.BOND_TYPE_NUM] != 26, :]
+        if not self.holded_info.empty:
+            self.holded_info = self.holded_info.loc[self.holded_info[C.BOND_TYPE_NUM] != 26, :]
