@@ -8,7 +8,7 @@ import streamlit as st
 
 from bond_tx import SecurityTx, CDTx, BondTx
 from fund_tx import Repo
-from utils.web_data import FundDataHandler, BondDataHandler
+from utils.web_data import FundDataHandler, SecurityDataHandler
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
 
@@ -17,6 +17,8 @@ from pyecharts.globals import ThemeType
 
 from utils.txn_factory import TxFactory
 from utils.web_view import tx_header, line_global, line_component, bar_global, pie_global
+from pyecharts.charts import Line, Bar, Pie
+from pyecharts import options as opts
 
 # set_page_config必须放在开头，不然会报错
 st.set_page_config(page_title="同业存单业务",
@@ -25,10 +27,12 @@ st.set_page_config(page_title="同业存单业务",
                    # 左边sidebar默认是展开的
                    initial_sidebar_state="expanded")
 
-st.markdown("## 🍳 同业存单业务")
+st.markdown("## 🍳 债券业务")
 st.divider()
 
 txn = None
+daily_data = pd.DataFrame({})
+daily_data_inst = pd.DataFrame({})
 
 # 按时间段查询的form
 with st.form("cd"):
@@ -55,72 +59,45 @@ with st.form("cd"):
 
 if txn_submit:
     txn = BondTx(start_time, end_time)
+    dh = SecurityDataHandler(txn)
+    daily_data = dh.daily_yield_all().reset_index()
+    daily_data_inst = dh.daily_yield_credit_bond().reset_index()
 
 bond_code = '160017.IB'
 
 if txn is not None:
-    st.write('## 债券业务')
+
     st.divider()
+    st.write("#### 🥇 每日余额利率情况")
+    st.write("###  ")
 
-    st.write('### 债券持仓记录')
-    st.write('#### 所有债券的基础信息, get_holded_bonds_info()，不包括收益凭证')
-    st.dataframe(txn.get_holded_bonds_info())
+    st.dataframe(daily_data)
+    st.dataframe(daily_data_inst)
 
-    st.write('#### 持仓区间明细, get_holded_bonds')
-    st.dataframe(txn.get_holded_bonds())
-    # #
-    st.write('#### ' + bond_code + '的每日持仓, daily_holded_bond(bond_code)')
-    st.dataframe(txn.daily_holded_bond(bond_code))
-    st.divider()
+    # 创建一个包含从start_time到end_time的所有日期的新的DataFrame
+    date_range = pd.date_range(start=start_time, end=end_time)
+    df_null = pd.DataFrame(date_range, columns=[C.DATE])
 
-    st.write('### 利息计算')
-    st.write('#### 区间内持仓债券利息现金流, get_inst_flow_all()')
-    st.dataframe(txn.get_inst_cash_flow_all())
-    #
-    st.write('#### ' + bond_code + '的利息现金流, inst_cash_flow(bond_code)')
-    st.dataframe(txn.get_inst_flow(bond_code))
+    # 扩充daily_data，使其包含所有的日期
+    daily_data_all = pd.merge(df_null, daily_data, on=C.DATE, how='left')
+    # 使用fillna函数将所有的缺失值填充为0
+    daily_data_all = daily_data_all.fillna(0)
 
-    st.write('#### ' + bond_code + '每日利息, get_daily_insts(bond_code)')
-    st.dataframe(txn.get_daily_insts(bond_code), use_container_width=True)
-    st.divider()
+    # 日均余额曲线
+    line_amt_all = line_global(daily_data_all, C.DATE, C.HOLD_AMT, "每日持仓（亿元）")
+    # 收益率
+    line_yield_all = line_component(daily_data_all, C.DATE, C.YIELD, "收益率（%）", color="#FF6347")
+    # 收益率不包含净价浮盈
+    line_yield_nn_all = line_component(daily_data_all, C.DATE, C.YIELD_NO_NET_PROFIT, "收益率（NN,%）",
+                                       color="green")
 
-    st.write('### 净价浮盈')
-    st.write('#### 区间内持仓债券估值get_daily_value_all()，若无估值，则在daily_value(bond_code)置为100')
-    st.dataframe(txn.get_daily_value_all())
+    streamlit_echarts.st_pyecharts(
+        # line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),
+        line_amt_all.overlap(line_yield_all).overlap(line_yield_nn_all),
+        theme=ThemeType.WALDEN,
+        height='600px'
+    )
 
-    st.write('#### ' + bond_code + '的估值, get_daily_value(bond_code)')
-    st.dataframe(txn.get_daily_value(bond_code))
 
-    st.write('#### 净价浮盈, get_net_profit(bond_code)')
-    df7 = txn.get_net_profit(bond_code)
-    st.dataframe(df7, use_container_width=True)
-    st.divider()
-
-    st.write('### 资本利得')
-    st.write('#### 交易记录')
-    st.write('#### 一级申购，request_distributions()')
-    st.dataframe(txn.get_request_distributions())
-
-    st.write('#### 二级交易, get_all_trades()')
-    st.dataframe(txn.get_all_trades())
-
-    st.write('#### 资本利得, get_capital_all()')
-    st.dataframe(txn.get_capital_all(), use_container_width=True)
-    st.divider()
-
-    st.write('### 综合收益汇总')
-    st.write('#### ' + bond_code + '的综合收益, sum_all_profit(bond_code)')
-    st.dataframe(txn.sum_all_profits(bond_code), use_container_width=True)
-
-    d = BondDataHandler(txn)
-
-    st.write('#### 每日收益合计, daily_yield_all()')
-    st.dataframe(d.daily_yield_all(), use_container_width=True)
-
-    st.write('#### 所有债券的总收益bond_yield_all()')
-    st.dataframe(d.bond_yield_all(), use_container_width=True)
-
-    st.write('#### ' + bond_code + '的总收益bond_yield(bond_code)')
-    st.dataframe(d.bond_yield(bond_code), use_container_width=True)
 else:
     st.divider()

@@ -7,7 +7,7 @@ import streamlit as st
 
 from bond_tx import SecurityTx
 from utils.time_util import TimeUtil
-from utils.web_data import BondDataHandler
+from utils.web_data import SecurityDataHandler
 
 # set_page_config必须放在开头，不然会报错
 st.set_page_config(page_title="数据测试",
@@ -100,10 +100,10 @@ if txn is not None:
     st.divider()
 
     st.write('### 综合收益汇总')
-    st.write('####' + bond_code + '的综合收益, sum_all_profit(bond_code)')
+    st.write('#### ' + bond_code + '的综合收益, sum_all_profit(bond_code)')
     st.dataframe(txn.sum_all_profits(bond_code), use_container_width=True)
 
-    d = BondDataHandler(txn)
+    d = SecurityDataHandler(txn)
 
     st.write('#### 每日收益合计, daily_yield_all()')
     st.dataframe(d.daily_yield_all(), use_container_width=True)

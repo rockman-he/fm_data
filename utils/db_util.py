@@ -167,7 +167,7 @@ class Constants:
     SHIBOR_ON = 'Shibor(O/N)'
     # SHIBOR_1W
     SHIBOR_1W = 'Shibor(1W)'
-
+    
     # ------------------------自定义中间字段------------------------
     # 统计天数
     WORK_DAYS = 'work_days'

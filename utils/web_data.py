@@ -216,11 +216,14 @@ class FundDataHandler:
         }
 
 
-class BondDataHandler:
+class SecurityDataHandler:
 
     def __init__(self, txn: SecurityTx) -> None:
         self.tx = txn
         self.raw = self.all_bonds_data()
+
+        # 利率债的sectype
+        self.inst_rate_bond = {0, 1, 6, 11}
 
     def all_bonds_data(self) -> pd.DataFrame:
         bonds = self.tx.get_holded_bonds_info()
@@ -237,7 +240,31 @@ class BondDataHandler:
         if self.raw.empty:
             return pd.DataFrame({})
 
-        raw_group = self.raw.groupby(C.DATE).agg({
+        raw_group = self.cal_daily_yield(self.raw)
+
+        return raw_group
+
+    def daily_yield_inst_rate_bond(self) -> pd.DataFrame:
+
+        if self.raw.empty:
+            return pd.DataFrame({})
+
+        raw_group = self.cal_daily_yield(self.raw[self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
+
+        return raw_group
+
+    def daily_yield_credit_bond(self) -> pd.DataFrame:
+
+        if self.raw.empty:
+            return pd.DataFrame({})
+
+        raw_group = self.cal_daily_yield(self.raw[~self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
+
+        return raw_group
+
+    def cal_daily_yield(self, bonds: pd.DataFrame) -> pd.DataFrame:
+
+        raw_group = bonds.groupby(C.DATE).agg({
             C.HOLD_AMT: lambda x: x.sum(),
             C.CAPITAL_OCCUPY: lambda x: x.sum(),
             C.CAPITAL_GAINS: lambda x: x.sum(),
@@ -245,12 +272,12 @@ class BondDataHandler:
             C.NET_PROFIT: lambda x: x.sum(),
             C.TOTAL_PROFIT: lambda x: x.sum()
         })
-
         # raw_group[C.YIELD] = raw_group[C.TOTAL_PROFIT] / raw_group[C.CAPITAL_OCCUPY] * 100 * 365
         # TODO 每日收益率计算方式待确认
         raw_group[C.YIELD] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS] + raw_group[C.NET_PROFIT])
                               / raw_group[C.CAPITAL_OCCUPY] * 100)
-
+        raw_group[C.YIELD_NO_NET_PROFIT] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS]) /
+                                            raw_group[C.CAPITAL_OCCUPY] * 100)
         return raw_group
 
     def bond_yield_all(self) -> pd.DataFrame:
@@ -346,8 +373,8 @@ class BondDataHandler:
 
         return bond_group
 
-    def get_raw(self) -> pd.DataFrame:
-        return self.raw
+    def get_txn_header(self) -> Dict:
+        pass
 
 
 if __name__ == "__main__":
@@ -357,5 +384,5 @@ if __name__ == "__main__":
     # d = FundDataHandler(TxFactory(Repo).create_txn(s_t, e_t, "正回购"))
     # print(d.daily_data())
 
-    d = BondDataHandler(SecurityTx(s_t, e_t))
+    d = SecurityDataHandler(SecurityTx(s_t, e_t))
     print(d.daily_yield_all())

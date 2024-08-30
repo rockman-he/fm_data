@@ -41,8 +41,9 @@ def line_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str, color: str
             # 定义bar柱体的颜色
             color=color,
             # 显示最高点的值
-            markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_="max")],
+            markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
                                               label_opts=(LabelOpts(font_size=9))),
+            is_smooth=True
         )
         # 副Y坐标轴（右边）
         .extend_axis(
@@ -78,8 +79,9 @@ def line_component(df: pd.DataFrame, xaxis, yaxis: str, title: str, color: str =
             yaxis_index=1,
             label_opts=opts.LabelOpts(is_show=False),
             color=color,
-            markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_="max")],
+            markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
                                               label_opts=(LabelOpts(font_size=9))),
+            is_smooth=True
         )
     )
 
