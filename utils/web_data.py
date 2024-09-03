@@ -227,6 +227,9 @@ class SecurityDataHandler:
 
     def all_bonds_data(self) -> pd.DataFrame:
         bonds = self.tx.get_holded_bonds_info()
+
+        if bonds.empty:
+            return pd.DataFrame({})
         bond_codes = bonds[C.BOND_CODE].tolist()
         bond_all = pd.DataFrame({})
 
@@ -301,7 +304,6 @@ class SecurityDataHandler:
             bond_code = row
             bond = self.raw[self.raw[C.BOND_CODE] == bond_code]
 
-            # todo
             # 如果卖空，净价浮盈为0
             if bond.iloc[-1][C.HOLD_AMT] == 0:
                 bond_group.loc[row, C.NET_PROFIT] = 0

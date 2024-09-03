@@ -127,6 +127,8 @@ class Constants:
     NET_PRICE2 = 'cleanprice'
     # 收益率
     YIELD = 'yield'
+    # 收益率累加
+    YIELD_CUM = 'yield_cum'
     # 收益率不包括净价浮盈
     YIELD_NO_NET_PROFIT = 'yield_no_net_profit'
     # 全价
@@ -167,7 +169,7 @@ class Constants:
     SHIBOR_ON = 'Shibor(O/N)'
     # SHIBOR_1W
     SHIBOR_1W = 'Shibor(1W)'
-    
+
     # ------------------------自定义中间字段------------------------
     # 统计天数
     WORK_DAYS = 'work_days'
@@ -199,12 +201,18 @@ class Constants:
     MIN_RATE = 'min_rate'
     # 资本利得
     CAPITAL_GAINS = 'capital_gains'
+    # 资本利得累加
+    CAPITAL_GAINS_CUM = 'capital_gains_cum'
     # 净价浮盈
     NET_PROFIT = 'net_profit'
+    # 净价浮盈减期初
+    NET_PROFIT_SUB = 'net_profit_sub'
     # 前一天的成本净价
     LAST_COST_NET_PRICE = 'last_cost_net_price'
     # 总收益
     TOTAL_PROFIT = 'total_profit'
+    # 区间总收益
+    TOTAL_PROFIT_CUM = 'total_profit_cum'
     # 资金占用
     CAPITAL_OCCUPY = 'capital_occupy'
 

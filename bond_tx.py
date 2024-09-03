@@ -19,7 +19,9 @@ class SecurityTx:
         self.trades = self._sum_all_trades()
         self.holded_info = self._holded_bonds_info()
 
-        bond_type = self.holded_info[[C.BOND_CODE, C.BOND_TYPE_NUM]]
+        bond_type = pd.DataFrame({})
+        if not self.holded_info.empty:
+            bond_type = self.holded_info[[C.BOND_CODE, C.BOND_TYPE_NUM]]
 
         self.request = self._request_distributions()
         self.insts_flow = self._inst_cash_flow_all()
@@ -144,9 +146,9 @@ class SecurityTx:
               f"from {C.COMP_DBNAME}.basic_bondvaluations bv " \
               f"where {C.BOND_CODE} in (" + bonds_code_str + ") " + \
               f" and date(bv.{C.DEAL_DATE}) >= '" + \
-              (self.start_time - datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
+              (self.start_time - datetime.timedelta(days=60)).strftime('%Y-%m-%d') + \
               f"' and date(bv.{C.DEAL_DATE}) <= '" + \
-              (self.end_time + datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
+              (self.end_time + datetime.timedelta(days=60)).strftime('%Y-%m-%d') + \
               f"' order by bv.{C.BOND_CODE}, bv.{C.DEAL_DATE};"
 
         raw = self._get_raw_data(sql)
@@ -156,6 +158,7 @@ class SecurityTx:
 
         return raw
 
+    # todo 有bug
     def get_daily_value(self, bond_code: str) -> pd.DataFrame:
 
         if (self.start_time > self.end_time or self.holded_info.empty or
@@ -349,7 +352,7 @@ class SecurityTx:
                              holded_copy[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
                              on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
 
-        # 理论上没有空值，但是源数据库数据有问题，暂时做此处理
+        # todo 理论上没有空值，但是源数据库数据有问题(20161219,160010)，暂时做此处理
         raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)

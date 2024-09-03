@@ -27,7 +27,8 @@ def tx_header(datas: Dict) -> None:
     col3.metric("最低单笔利率（%）", '{:.2f}'.format(datas['occ'][C.MIN_RATE] * 100))
 
 
-def line_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str, color: str = "#37a2da") -> Line:
+def line_global(df: pd.DataFrame, xaxis: str, yaxis: str, yaxis_name: str, color: str = "#37a2da", title="",
+                subtitle="") -> Line:
     x_data = df[xaxis].dt.strftime('%Y-%m-%d').values.tolist()
     line = (
         Line()
@@ -35,7 +36,7 @@ def line_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str, color: str
         # 主Y坐标轴（左边）
         .add_yaxis(
             # 图例显示
-            title,
+            yaxis_name,
             # 数据
             (df[yaxis] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
             # 定义bar柱体的颜色
@@ -57,26 +58,27 @@ def line_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str, color: str
         .set_global_opts(
             # 以十字交叉坐标指针显示
             tooltip_opts=opts.TooltipOpts(
-                is_show=True, trigger="axis", axis_pointer_type="cross"
+                is_show=True, trigger="axis", axis_pointer_type="cross",
             ),
+            title_opts=opts.TitleOpts(title=title, subtitle=subtitle),
         )
     )
 
     return line
 
 
-def line_component(df: pd.DataFrame, xaxis, yaxis: str, title: str, color: str = 'red') -> Line:
+def line_component(df: pd.DataFrame, xaxis, yaxis: str, yaxis_name: str, color: str = 'red', yaxis_index=1) -> Line:
     x_data = df[xaxis].dt.strftime('%Y-%m-%d').values.tolist()
 
     line = (
         Line()
         .add_xaxis(x_data)
         .add_yaxis(
-            title,
+            yaxis_name,
             df[yaxis].apply(lambda x: '%.2f' % x).values.tolist(),
             # 使用的 y 轴的 index，在单个图表实例中存在多个 y 轴的时候有用。
             # 因为使用的是副轴，所以为1（从0开始）
-            yaxis_index=1,
+            yaxis_index=yaxis_index,
             label_opts=opts.LabelOpts(is_show=False),
             color=color,
             markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],

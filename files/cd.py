@@ -19,25 +19,25 @@ from utils.txn_factory import TxFactory
 from utils.web_view import tx_header, line_global, line_component, bar_global, pie_global
 
 # set_page_config必须放在开头，不然会报错
-st.set_page_config(page_title="债券业务",
+st.set_page_config(page_title="同业存单",
                    page_icon="📈",
                    layout="wide",
                    # 左边sidebar默认是展开的
                    initial_sidebar_state="expanded")
 
-st.markdown("## 🍳 同业存单")
+st.markdown("## 同业存单")
 st.divider()
 
 txn = None
 daily_data = pd.DataFrame({})
 
 # 按时间段查询的form
-with st.form("bond"):
+with st.form("CD"):
     txn_start_time, txn_end_time, txn_cps_type = st.columns([1, 1, 3])
     with txn_start_time:
         start_time = st.date_input(
             "⏱起始时间",
-            value=TimeUtil.get_current_and_last_month_dates()[1],
+            value=TimeUtil.get_current_and_last_year()[0],
             # 要明确每个组件的key，不然会共用一个组件
             key='bond_start_time'
         )
@@ -61,38 +61,39 @@ if txn_submit:
 
 bond_code = '112006088.IB'
 
-if not daily_data.empty:
+if txn is not None:
 
-    st.divider()
-    st.write("#### 🥇 每日余额利率情况")
-    st.write("###  ")
+    if not daily_data.empty:
+        st.divider()
+        st.write("#### 每日持仓和收益率")
+        st.write("###  ")
 
-    st.dataframe(daily_data)
+        # st.dataframe(daily_data)
 
-    # 创建一个包含从start_time到end_time的所有日期的新的DataFrame
-    date_range = pd.date_range(start=start_time, end=end_time)
-    df_null = pd.DataFrame(date_range, columns=[C.DATE])
+        # 创建一个包含从start_time到end_time的所有日期的新的DataFrame
+        date_range = pd.date_range(start=start_time, end=end_time)
+        df_null = pd.DataFrame(date_range, columns=[C.DATE])
 
-    # 扩充daily_data，使其包含所有的日期
-    daily_data = pd.merge(df_null, daily_data, on=C.DATE, how='left')
-    # 使用fillna函数将所有的缺失值填充为0
-    daily_data = daily_data.fillna(0)
+        # 扩充daily_data，使其包含所有的日期
+        daily_data = pd.merge(df_null, daily_data, on=C.DATE, how='left')
+        # 使用fillna函数将所有的缺失值填充为0
+        daily_data = daily_data.fillna(0)
 
-    # 日均余额曲线
-    line_amt = line_global(daily_data, C.DATE, C.HOLD_AMT, "每日持仓（亿元）")
-    # 收益率
-    line_yield = line_component(daily_data, C.DATE, C.YIELD, "收益率（%）", color="#FF6347")
-    # 收益率不包含净价浮盈
-    line_yield_no_netprofit = line_component(daily_data, C.DATE, C.YIELD_NO_NET_PROFIT, "收益率（%, 不含净价浮盈）",
-                                             color="green")
+        # 日均余额曲线
+        line_amt = line_global(daily_data, C.DATE, C.HOLD_AMT, "每日持仓（亿元）")
+        # 收益率
+        line_yield = line_component(daily_data, C.DATE, C.YIELD, "收益率（%）", color="#FF6347")
+        # 收益率不包含净价浮盈
+        line_yield_no_netprofit = line_component(daily_data, C.DATE, C.YIELD_NO_NET_PROFIT, "收益率（%, 不含净价浮盈）",
+                                                 color="green")
 
-    streamlit_echarts.st_pyecharts(
-        # line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),
-        line_amt.overlap(line_yield).overlap(line_yield_no_netprofit),
-        theme=ThemeType.WALDEN,
-        height='600px'
-    )
+        streamlit_echarts.st_pyecharts(
+            # line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),
+            line_amt.overlap(line_yield).overlap(line_yield_no_netprofit),
+            theme=ThemeType.WALDEN,
+            height='600px'
+        )
 
 
 else:
-    st.write('无数据')
+    st.write('请查询')

@@ -34,6 +34,26 @@ class TimeUtil:
         # Return the start date of the current month, the start date and the end date of the last month
         return func_this_month_start, func_last_month_start, func_last_month_end
 
+    @staticmethod
+    def get_current_and_last_year(dates: datetime = datetime.now()) -> tuple[datetime, datetime]:
+        """
+        This function returns the start date of the current year and the start date of the last year.
+
+        :param dates: A datetime object representing the current moment. If not provided, defaults to the current
+        datetime.
+        :type dates: datetime, optional
+        :return: A tuple containing two datetime objects.
+        The first object is the start date of the current year,
+        and the second object is the start date of the last year.
+        :rtype: tuple[datetime, datetime]
+        """
+        # Calculate the start date of the current year
+        func_this_year_start = datetime(dates.year, 1, 1)
+        # Calculate the start date of the last year
+        func_last_year_start = datetime(dates.year - 1, 1, 1)
+        # Return the start date of the current year and the start date of the last year
+        return func_this_year_start, func_last_year_start
+
 
 if __name__ == '__main__':
     # Test the TimeUtil class
