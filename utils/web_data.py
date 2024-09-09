@@ -217,15 +217,46 @@ class FundDataHandler:
 
 
 class SecurityDataHandler:
+    """
+    A class used to handle security data.
+
+    Attributes
+    ----------
+    tx : SecurityTx
+        The transaction to handle.
+    raw : pd.DataFrame
+        The raw data of all bonds.
+    inst_rate_bond : set
+        The set of bond types that are considered as interest rate bonds.
+    """
 
     def __init__(self, txn: SecurityTx) -> None:
+        """
+        Constructs all the necessary attributes for the SecurityDataHandler object.
+
+        Parameters
+        ----------
+            txn : SecurityTx
+                The transaction to handle.
+        """
         self.tx = txn
-        self.raw = self.all_bonds_data()
+        self.raw = self._profits_data_all()
+        self.yield_all = self.period_yield_all()
 
         # 利率债的sectype
         self.inst_rate_bond = {0, 1, 6, 11}
 
-    def all_bonds_data(self) -> pd.DataFrame:
+    def _profits_data_all(self) -> pd.DataFrame:
+
+        """
+        Returns the profits data of all bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The data of all bonds.
+        """
+
         bonds = self.tx.get_holded_bonds_info()
 
         if bonds.empty:
@@ -240,32 +271,74 @@ class SecurityDataHandler:
 
     def daily_yield_all(self) -> pd.DataFrame:
 
+        """
+        Returns the daily yield of all bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The daily yield of all bonds.
+        """
+
         if self.raw.empty:
             return pd.DataFrame({})
 
-        raw_group = self.cal_daily_yield(self.raw)
+        raw_group = self._cal_daily_yield(self.raw)
 
         return raw_group
 
     def daily_yield_inst_rate_bond(self) -> pd.DataFrame:
 
+        """
+        Returns the daily yield of interest rate bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The daily yield of interest rate bonds.
+        """
+
         if self.raw.empty:
             return pd.DataFrame({})
 
-        raw_group = self.cal_daily_yield(self.raw[self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
+        raw_group = self._cal_daily_yield(self.raw[self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
 
         return raw_group
 
     def daily_yield_credit_bond(self) -> pd.DataFrame:
 
+        """
+        Returns the daily yield of credit bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The daily yield of credit bonds.
+        """
+
         if self.raw.empty:
             return pd.DataFrame({})
 
-        raw_group = self.cal_daily_yield(self.raw[~self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
+        raw_group = self._cal_daily_yield(self.raw[~self.raw[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)])
 
         return raw_group
 
-    def cal_daily_yield(self, bonds: pd.DataFrame) -> pd.DataFrame:
+    # todo 1.1 保留每日收益率计算，留以后结合负债做收益计算
+    def _cal_daily_yield(self, bonds: pd.DataFrame) -> pd.DataFrame:
+
+        """
+        Calculates the daily yield of the given bonds.
+
+        Parameters
+        ----------
+        bonds : pd.DataFrame
+            The bonds to calculate the daily yield for.
+
+        Returns
+        -------
+        pd.DataFrame
+            The daily yield of the given bonds.
+        """
 
         raw_group = bonds.groupby(C.DATE).agg({
             C.HOLD_AMT: lambda x: x.sum(),
@@ -275,15 +348,22 @@ class SecurityDataHandler:
             C.NET_PROFIT: lambda x: x.sum(),
             C.TOTAL_PROFIT: lambda x: x.sum()
         })
-        # raw_group[C.YIELD] = raw_group[C.TOTAL_PROFIT] / raw_group[C.CAPITAL_OCCUPY] * 100 * 365
-        # TODO 每日收益率计算方式待确认
+        # todo 1.1.1 每日收益率计算
         raw_group[C.YIELD] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS] + raw_group[C.NET_PROFIT])
                               / raw_group[C.CAPITAL_OCCUPY] * 100)
         raw_group[C.YIELD_NO_NET_PROFIT] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS]) /
                                             raw_group[C.CAPITAL_OCCUPY] * 100)
         return raw_group
 
-    def bond_yield_all(self) -> pd.DataFrame:
+    def period_yield_all(self) -> pd.DataFrame:
+        """
+        Returns the period yield of all bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The period yield of all bonds.
+        """
 
         if self.raw.empty:
             return pd.DataFrame({})
@@ -295,11 +375,11 @@ class SecurityDataHandler:
             C.CAPITAL_OCCUPY: lambda x: x.mean(),
             C.CAPITAL_GAINS: lambda x: x.sum(),
             C.INST_A_DAY: lambda x: x.sum()
-            # C.NET_PROFIT: lambda x: x.mean(),
-            # C.TOTAL_PROFIT: lambda x: x.sum()
         })
+        bond_group.rename(columns={C.INST_A_DAY: C.INST_DAYS}, inplace=True)
         bond_group[C.COST_NET_PRICE] = bond_group[C.CAPITAL_OCCUPY] / bond_group[C.HOLD_AMT] * 100
 
+        # 对每支债券做收益计算
         for row in bond_group.index:
             bond_code = row
             bond = self.raw[self.raw[C.BOND_CODE] == bond_code]
@@ -316,11 +396,11 @@ class SecurityDataHandler:
 
             bond_group.loc[row, C.TOTAL_PROFIT] = (bond_group.loc[row, C.CAPITAL_GAINS] +
                                                    bond_group.loc[row, C.NET_PROFIT] +
-                                                   bond_group.loc[row, C.INST_A_DAY])
+                                                   bond_group.loc[row, C.INST_DAYS])
 
-            # 无持仓则没有资金占用，区间内不计入无持仓的天数
-            # count_days = len(bond.loc[row & bond.loc[row, C.HOLD_AMT] != 0])
+            # 无持仓则没有资金占用，区间内不计入持仓天数
             count_days = len(bond.loc[bond[C.HOLD_AMT] != 0])
+            # todo 1.2 年化收益率计算方式
             bond_group.loc[row, C.YIELD] = (bond_group.loc[row, C.TOTAL_PROFIT] * 365 /
                                             bond_group.loc[row, C.CAPITAL_OCCUPY] / count_days * 100)
             bond_group.loc[row, C.YIELD_NO_NET_PROFIT] = ((bond_group.loc[row, C.TOTAL_PROFIT] -
@@ -329,54 +409,25 @@ class SecurityDataHandler:
 
         return bond_group
 
-    def bond_yield(self, bond_code: str) -> pd.DataFrame:
+    def period_yield_bond(self, bond_code: str) -> pd.DataFrame:
+        """
+        Returns the period yield of the bond with the given code.
 
-        if self.raw.empty:
+        Parameters
+        ----------
+        bond_code : str
+            The code of the bond to return the period yield for.
+
+        Returns
+        -------
+        pd.DataFrame
+            The yield of the bond with the given code.
+        """
+
+        if self.yield_all.empty or bond_code not in self.yield_all.index.tolist():
             return pd.DataFrame({})
 
-        bond = self.raw[self.raw[C.BOND_CODE] == bond_code]
-
-        if bond.empty:
-            return pd.DataFrame({})
-
-        bond_group = bond.groupby([C.BOND_CODE, C.BOND_NAME, C.MARKET_CODE]).agg({
-            C.HOLD_AMT: lambda x: x.mean(),
-            C.CAPITAL_OCCUPY: lambda x: x.mean(),
-            C.CAPITAL_GAINS: lambda x: x.sum(),
-            C.INST_A_DAY: lambda x: x.sum()
-            # C.NET_PROFIT: lambda x: x.mean(),
-            # C.TOTAL_PROFIT: lambda x: x.sum()
-        })
-
-        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        #     print(bond_group)
-
-        bond_group[C.COST_NET_PRICE] = bond_group[C.CAPITAL_OCCUPY] / bond_group[C.HOLD_AMT] * 100
-
-        # todo 区间特定债券的收益率计算方式待确认
-
-        # 如果卖空，净价浮盈为0
-        if bond.iloc[-1][C.HOLD_AMT] == 0:
-            bond_group[C.NET_PROFIT] = 0
-        # 如果统计天数为1天，净价浮盈为当日净价浮盈
-        elif len(bond) == 1:
-            bond_group[C.NET_PROFIT] = bond.iloc[0][C.NET_PROFIT]
-        # 否则，净价浮盈为区间最后一天净价浮盈减去区间第一天净价浮盈
-        else:
-            bond_group[C.NET_PROFIT] = bond.iloc[-1][C.NET_PROFIT] - bond.iloc[0][C.NET_PROFIT]
-
-        bond_group[C.TOTAL_PROFIT] = bond_group[C.CAPITAL_GAINS] + bond_group[C.NET_PROFIT] + bond_group[C.INST_A_DAY]
-
-        # 无持仓则没有资金占用，区间内不计入无持仓的天数
-        count_days = len(bond.loc[bond[C.HOLD_AMT] != 0])
-        bond_group[C.YIELD] = bond_group[C.TOTAL_PROFIT] * 365 / bond_group[C.CAPITAL_OCCUPY] / count_days * 100
-        bond_group[C.YIELD_NO_NET_PROFIT] = ((bond_group[C.TOTAL_PROFIT] - bond_group[C.NET_PROFIT]) *
-                                             365 / bond_group[C.CAPITAL_OCCUPY] / count_days * 100)
-
-        return bond_group
-
-    def get_txn_header(self) -> Dict:
-        pass
+        return self.yield_all.loc[[bond_code]]
 
 
 if __name__ == "__main__":

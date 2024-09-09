@@ -109,7 +109,7 @@ if txn is not None:
     st.dataframe(d.daily_yield_all(), use_container_width=True)
 
     st.write('#### 所有债券的总收益bond_yield_all()')
-    st.dataframe(d.bond_yield_all(), use_container_width=True)
+    st.dataframe(d.period_yield_all(), use_container_width=True)
 
     st.write('#### ' + bond_code + '的总收益bond_yield(bond_code)')
-    st.dataframe(d.bond_yield(bond_code), use_container_width=True)
+    st.dataframe(d.period_yield_bond(bond_code), use_container_width=True)
