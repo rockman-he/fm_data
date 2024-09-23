@@ -215,6 +215,8 @@ class Constants:
     TOTAL_PROFIT_CUM = 'total_profit_cum'
     # 资金占用
     CAPITAL_OCCUPY = 'capital_occupy'
+    # 累计资金占用
+    CAPITAL_OCCUPY_CUM = 'capital_occupy_cum'
 
 
 @st.cache_resource

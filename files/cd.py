@@ -16,7 +16,7 @@ import streamlit_echarts
 from pyecharts.globals import ThemeType
 
 from utils.txn_factory import TxFactory
-from utils.web_view import tx_header, line_global, line_component, bar_global, pie_global
+from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global
 
 # set_page_config必须放在开头，不然会报错
 st.set_page_config(page_title="同业存单",
@@ -80,7 +80,7 @@ if txn is not None:
         daily_data = daily_data.fillna(0)
 
         # 日均余额曲线
-        line_amt = line_global(daily_data, C.DATE, C.HOLD_AMT, "每日持仓（亿元）")
+        line_amt = fund_line_global(daily_data, C.DATE, C.HOLD_AMT, "每日持仓（亿元）")
         # 收益率
         line_yield = line_component(daily_data, C.DATE, C.YIELD, "收益率（%）", color="#FF6347")
         # 收益率不包含净价浮盈
@@ -90,7 +90,6 @@ if txn is not None:
         streamlit_echarts.st_pyecharts(
             # line_amt.overlap(line_irt).overlap(line_R001).overlap(line_R007),
             line_amt.overlap(line_yield).overlap(line_yield_no_netprofit),
-            theme=ThemeType.WALDEN,
             height='600px'
         )
 

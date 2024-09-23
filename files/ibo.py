@@ -15,7 +15,7 @@ import streamlit_echarts
 from pyecharts.globals import ThemeType
 
 from utils.txn_factory import TxFactory
-from utils.web_view import tx_header, line_global, line_component, bar_global, pie_global
+from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global
 
 # set_page_config必须放在开头，不然会报错
 st.set_page_config(page_title="拆借业务",
@@ -65,14 +65,14 @@ if (dh['party']).empty:
 else:
 
     # 显示交易统计信息
-    tx_header(dh)
+    fund_tx_header(dh)
 
     st.divider()
     st.markdown("#### 🥇 每日余额利率情况")
     st.write("###  ")
 
     # 拆借业务的日均余额曲线
-    line_amt = line_global(dh['holded'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
+    line_amt = fund_line_global(dh['holded'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")
 
     # 拆借业务的加权利率曲线
     line_irt = line_component(dh['holded'], C.AS_DT, C.WEIGHT_RATE, '加权利率（%）', 'red')

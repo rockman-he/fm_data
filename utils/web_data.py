@@ -246,6 +246,18 @@ class SecurityDataHandler:
         # 利率债的sectype
         self.inst_rate_bond = {0, 1, 6, 11}
 
+    def get_raw(self) -> pd.DataFrame:
+        """
+        Returns the raw data of all bonds.
+
+        Returns
+        -------
+        pd.DataFrame
+            The raw data of all bonds.
+        """
+
+        return self.raw
+
     def _profits_data_all(self) -> pd.DataFrame:
 
         """
@@ -286,6 +298,66 @@ class SecurityDataHandler:
         raw_group = self._cal_daily_yield(self.raw)
 
         return raw_group
+
+    def daily_yield_all_cum(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
+
+        """
+        Returns the cumulative daily yield of all bonds.
+
+        Parameters
+        ----------
+        start_time : datetime.date
+            The start time of the cumulative period.
+        end_time : datetime.date
+            The end time of the cumulative period.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cumulative daily yield of all bonds.
+        """
+
+        return self._cal_daily_yield_cum(self.daily_yield_all(), start_time, end_time)
+
+    def daily_yield_inst_cum(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
+
+        """
+        Returns the cumulative daily yield of interest rate bonds.
+
+        Parameters
+        ----------
+        start_time : datetime.date
+            The start time of the cumulative period.
+        end_time : datetime.date
+            The end time of the cumulative period.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cumulative daily yield of interest rate bonds.
+        """
+
+        return self._cal_daily_yield_cum(self.daily_yield_inst_rate_bond(), start_time, end_time)
+
+    def daily_yield_credit_cum(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
+
+        """
+        Returns the cumulative daily yield of credit bonds.
+
+        Parameters
+        ----------
+        start_time : datetime.date
+            The start time of the cumulative period.
+        end_time : datetime.date
+            The end time of the cumulative period.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cumulative daily yield of credit bonds.
+        """
+
+        return self._cal_daily_yield_cum(self.daily_yield_credit_bond(), start_time, end_time)
 
     def daily_yield_inst_rate_bond(self) -> pd.DataFrame:
 
@@ -353,7 +425,60 @@ class SecurityDataHandler:
                               / raw_group[C.CAPITAL_OCCUPY] * 100)
         raw_group[C.YIELD_NO_NET_PROFIT] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS]) /
                                             raw_group[C.CAPITAL_OCCUPY] * 100)
+
         return raw_group
+
+    def _cal_daily_yield_cum(self, bonds_data: pd.DataFrame, start_time: datetime.date,
+                             end_time: datetime.date) -> pd.DataFrame:
+
+        date_range = pd.date_range(start=start_time, end=end_time)
+        df_null = pd.DataFrame(date_range, columns=[C.DATE])
+
+        daily_data = bonds_data
+
+        daily_data_cum = pd.merge(df_null, daily_data, on=C.DATE, how='left')
+
+        daily_data_cum = daily_data_cum.fillna(0)
+
+        # 计算累计利息收入
+        # daily_all_cum[C.INST_A_DAY] = daily_all_cum[C.INST_A_DAY].fillna(0)
+        daily_data_cum[C.INST_DAYS] = daily_data_cum[C.INST_A_DAY].cumsum()
+
+        # 计算累计资本利得
+        # daily_all_cum[C.CAPITAL_GAINS] = daily_all_cum[C.CAPITAL_GAINS].fillna(0)
+        daily_data_cum[C.CAPITAL_GAINS_CUM] = daily_data_cum[C.CAPITAL_GAINS].cumsum()
+
+        # 计算累计净价浮盈
+        # daily_all_cum[C.NET_PROFIT] = daily_all_cum[C.NET_PROFIT].fillna(0)
+        daily_data_cum[C.NET_PROFIT_SUB] = daily_data_cum[C.NET_PROFIT] - daily_data_cum[C.NET_PROFIT].iloc[0]
+
+        # 如果当日无持仓，忽略当日的净价浮盈
+        # daily_all_cum[C.HOLD_AMT] = daily_all_cum[C.HOLD_AMT].fillna(0)
+        daily_data_cum.loc[daily_data_cum[C.HOLD_AMT] == 0, C.NET_PROFIT_SUB] = 0
+
+        # 计算累计总收益
+        daily_data_cum[C.TOTAL_PROFIT_CUM] = daily_data_cum[C.NET_PROFIT_SUB] + daily_data_cum[C.CAPITAL_GAINS_CUM] + \
+                                             daily_data_cum[C.INST_DAYS]
+
+        # 计算daily_data_cum[C.CAPITAL_OCCUPY]的累积和
+        # daily_all_cum[C.CAPITAL_OCCUPY] = daily_all_cum[C.CAPITAL_OCCUPY].fillna(0)
+        daily_data_cum[C.CAPITAL_OCCUPY_CUM] = daily_data_cum[C.CAPITAL_OCCUPY].cumsum()
+
+        # 将C.CAPITAL_OCCUPY列中的非零值设置为1
+        daily_data_cum['non_zero'] = (daily_data_cum[C.CAPITAL_OCCUPY] != 0).astype(int)
+        # 对于资金占用为0的清醒，统计实际资金占用统计天数
+        daily_data_cum[C.WORK_DAYS] = daily_data_cum['non_zero'].cumsum()
+        # 删除临时列
+        del daily_data_cum['non_zero']
+
+        # 计算区间收益的值
+        daily_data_cum[C.YIELD_CUM] = ((daily_data_cum[C.INST_DAYS] * 365 /
+                                        daily_data_cum[C.WORK_DAYS] + daily_data_cum[C.CAPITAL_GAINS_CUM] +
+                                        daily_data_cum[C.NET_PROFIT_SUB]) /
+                                       (daily_data_cum[C.CAPITAL_OCCUPY_CUM] /
+                                        daily_data_cum[C.WORK_DAYS]) * 100)
+
+        return daily_data_cum
 
     def period_yield_all(self) -> pd.DataFrame:
         """
