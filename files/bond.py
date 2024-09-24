@@ -83,32 +83,129 @@ if txn is not None:
         # st.expander('详细数据').write(daily_all_cum.loc[daily_all_cum[C.HOLD_AMT] != 0, :])
         # st.expander('详细数据').write(daily_all_cum)
 
-        tab1, tab2, tab3 = st.tabs(["全部债券", "利率债", "信用债"])
+        daily_all_cum = dh.daily_yield_all_cum(start_time, end_time)
+        daily_all_cum[C.BOND_TYPE] = '全部债券'
+        daily_inst_cum = dh.daily_yield_inst_cum(start_time, end_time)
+        daily_inst_cum[C.BOND_TYPE] = '利率债'
+        daily_credit_cum = dh.daily_yield_credit_cum(start_time, end_time)
+        daily_credit_cum[C.BOND_TYPE] = '信用债'
 
-        with tab1:
-            daily_all_cum = dh.daily_yield_all_cum(start_time, end_time)
 
-            # temp1 = streamlit_echarts.st_pyecharts(
-            #     chart=security_line(daily_all_cum),
-            #     # c,
-            #     theme=ThemeType.WALDEN,
-            #     height='700px',
-            #     key='all'
-            # )
-            # tab1.write(temp1)
+        # tab1, tab2, tab3 = st.tabs(["全部债券", "利率债", "信用债"])
+        #
+        # with tab1:
+        #     # temp1 = streamlit_echarts.st_pyecharts(
+        #     #     chart=security_line(daily_all_cum),
+        #     #     # c,
+        #     #     theme=ThemeType.WALDEN,
+        #     #     height='700px',
+        #     #     key='all'
+        #     # )
+        #     # tab1.write(temp1)
+        #
+        #     html(security_line(daily_all_cum).render_embed(), height=800)
+        #
+        # with tab2:
+        #     html(security_line(daily_inst_cum).render_embed(), height=800)
+        #
+        # with tab3:
+        #     html(security_line(daily_credit_cum).render_embed(), height=800)
 
-            # chart = security_line(daily_all_cum).render_embed()
-            html(security_line(daily_all_cum).render_embed(), height=800)
+        @st.fragment
+        def yield_chart():
+            with st.container():
+                bond_type = st.radio("### 债券类型", ['全部债券', '利率债', '信用债'], index=0, horizontal=True)
+                if bond_type == '全部债券':
+                    streamlit_echarts.st_pyecharts(
+                        security_line(daily_all_cum),
+                        height='600px'
+                    )
 
-        with tab2:
-            daily_inst_cum = dh.daily_yield_inst_cum(start_time, end_time)
-            # chart = security_line(daily_inst_cum).render_embed()
-            html(security_line(daily_inst_cum).render_embed(), height=800)
+                    # st.dataframe(SecurityDataHandler.bond_yield_format(daily_all_cum))
+                    st.expander('详细数据').write(daily_all_cum)
 
-        with tab3:
-            daily_credit_cum = dh.daily_yield_credit_cum(start_time, end_time)
-            # chart = security_line(daily_inst_cum).render_embed()
-            html(security_line(daily_credit_cum).render_embed(), height=800)
+                if bond_type == '利率债':
+                    streamlit_echarts.st_pyecharts(
+                        security_line(daily_inst_cum),
+                        height='600px'
+                    )
+
+                    st.expander('详细数据').write(daily_inst_cum)
+
+                if bond_type == '信用债':
+                    streamlit_echarts.st_pyecharts(
+                        security_line(daily_credit_cum),
+                        height='600px'
+                    )
+
+                    st.expander('详细数据').write(daily_credit_cum)
+
+
+        yield_chart()
+        st.divider()
+
+        #
+        st.markdown("#### 单支债券收益")
+        st.dataframe(dh.yield_all_cum_by_code(start_time, end_time), use_container_width=True,
+                     hide_index=True,
+                     column_config={
+                         C.BOND_CODE: '债券代码',
+                         C.BOND_NAME: '债券名称',
+                         C.AVG_AMT: '日均债券持仓（元）',
+                         C.CAPITAL_OCCUPY: '日均资金占用（元）',
+                         C.INTEREST_AMT: '利息收入（元）',
+                         C.NET_PROFIT_SUB: '净价浮盈（元）',
+                         C.CAPITAL_GAINS: '资本利得（元）',
+                         C.TOTAL_PROFIT_CUM: '总收益（元）',
+                         C.YIELD_CUM: '区间收益率（%）'
+                     })
+
+        st.markdown("#### 按债券类型分类")
+        st.dataframe(SecurityDataHandler.bond_yield_format([daily_inst_cum, daily_credit_cum,
+                                                            daily_all_cum], start_time, end_time, [C.BOND_TYPE]),
+                     use_container_width=True,
+                     hide_index=True,
+                     column_config={
+                         C.BOND_TYPE: '债券类型',
+                         C.AVG_AMT: '日均债券持仓（元）',
+                         C.CAPITAL_OCCUPY: '日均资金占用（元）',
+                         C.INTEREST_AMT: '利息收入（元）',
+                         C.NET_PROFIT_SUB: '净价浮盈（元）',
+                         C.CAPITAL_GAINS: '资本利得（元）',
+                         C.TOTAL_PROFIT_CUM: '总收益（元）',
+                         C.YIELD_CUM: '区间收益率（%）'
+                     })
+
+        st.markdown("#### 按交易市场分类")
+        st.dataframe(dh.yield_all_cum_by_market(start_time, end_time), use_container_width=True,
+                     hide_index=True,
+                     column_config={
+                         C.MARKET_CODE: '市场代码',
+                         C.AVG_AMT: '日均债券持仓（元）',
+                         C.CAPITAL_OCCUPY: '日均资金占用（元）',
+                         C.INTEREST_AMT: '利息收入（元）',
+                         C.NET_PROFIT_SUB: '净价浮盈（元）',
+                         C.CAPITAL_GAINS: '资本利得（元）',
+                         C.TOTAL_PROFIT_CUM: '总收益（元）',
+                         C.YIELD_CUM: '区间收益率（%）'
+                     })
+
+        st.markdown("#### 按发行人分类")
+        st.dataframe(dh.yield_all_cum_by_org(start_time, end_time), use_container_width=True,
+                     hide_index=True,
+                     column_config={
+                         C.ISSUE_ORG: '发行人',
+                         C.AVG_AMT: '日均债券持仓（元）',
+                         C.CAPITAL_OCCUPY: '日均资金占用（元）',
+                         C.INTEREST_AMT: '利息收入（元）',
+                         C.NET_PROFIT_SUB: '净价浮盈（元）',
+                         C.CAPITAL_GAINS: '资本利得（元）',
+                         C.TOTAL_PROFIT_CUM: '总收益（元）',
+                         C.YIELD_CUM: '区间收益率（%）'
+                     })
+
+        # st.markdown('raw')
+        # st.dataframe(dh.get_raw())
 
 
 else:

@@ -114,7 +114,7 @@ def security_line(bond_data: pd.DataFrame) -> RectChart:
             ),
         )
         .set_global_opts(
-            title_opts=opts.TitleOpts(title="收益分布", subtitle=""),
+            title_opts=opts.TitleOpts(title="", subtitle=""),
             xaxis_opts=opts.AxisOpts(
                 axistick_opts=opts.AxisTickOpts(is_align_with_label=True),
                 is_scale=False,

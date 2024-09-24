@@ -47,7 +47,7 @@ with st.form("test"):
 if txn_submit:
     txn = SecurityTx(start_time, end_time)
 
-bond_code = '160017.IB'
+bond_code = '102281812.IB'
 
 if txn is not None:
     st.write('## 债券业务')
