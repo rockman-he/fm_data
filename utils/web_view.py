@@ -10,7 +10,6 @@ from pyecharts import options as opts
 from pyecharts.charts import Line, Bar, Pie
 from pyecharts.charts.chart import RectChart
 from pyecharts.options import LabelOpts
-from pyecharts.globals import ThemeType
 
 from utils.db_util import Constants as C
 

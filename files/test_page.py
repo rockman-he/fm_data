@@ -101,15 +101,15 @@ if txn is not None:
 
     st.write('### 综合收益汇总')
     st.write('#### ' + bond_code + '的综合收益, sum_all_profit(bond_code)')
-    st.dataframe(txn.sum_all_profits(bond_code), use_container_width=True)
+    st.dataframe(txn.sum_profits(bond_code), use_container_width=True)
 
     d = SecurityDataHandler(txn)
 
     st.write('#### 每日收益合计, daily_yield_all()')
     st.dataframe(d.daily_yield_all(), use_container_width=True)
 
-    st.write('#### 所有债券的总收益period_yield_all()')
-    st.dataframe(d.period_yield_all(), use_container_width=True)
+    st.write('#### 所有债券的总收益yield_all_cum_by_code(start_time, end_time)')
+    st.dataframe(d.yield_cum_by_code(start_time, end_time), use_container_width=True)
 
-    st.write('#### ' + bond_code + '的总收益period_yield_bond(bond_code)')
-    st.dataframe(d.period_yield_bond(bond_code), use_container_width=True)
+    # st.write('#### ' + bond_code + '的总收益period_yield_bond(bond_code)')
+    # st.dataframe(d.period_yield_bond(bond_code), use_container_width=True)

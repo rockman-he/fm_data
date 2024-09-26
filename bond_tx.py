@@ -118,7 +118,7 @@ class SecurityTx:
         self.insts_flow = self._inst_cash_flow_all()
         self.value = self._daily_value_all()
         self.holded = self._daily_holded_all()
-        self.capital = self._capital_all()
+        self.capital = self._capital_gains_all()
 
         if not bond_type.empty:
 
@@ -646,7 +646,7 @@ class SecurityTx:
             return pd.concat([bank, exchange], ignore_index=True)
 
     # todo 3.1 全量资本利得获取
-    def _capital_all(self) -> pd.DataFrame:
+    def _capital_gains_all(self) -> pd.DataFrame:
         """
         Retrieves the capital of all bonds involved in the transaction from the database.
 
@@ -739,10 +739,10 @@ class SecurityTx:
         return raw_inst
 
     # todo 4.2 计算单只债券的资本利得
-    def get_capital(self, bond_code: str) -> pd.DataFrame:
+    def get_capital_gains(self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the capital of a specific bond involved in the transaction.
+        Retrieves the capital gains of a specific bond involved in the transaction.
 
         This method filters the capital data based on the provided bond code.
 
@@ -806,7 +806,7 @@ class SecurityTx:
         return raw_value
 
     # todo 4.4 计算单只债券的总收益
-    def sum_all_profits(self, bond_code: str) -> pd.DataFrame:
+    def sum_profits(self, bond_code: str) -> pd.DataFrame:
         """
         Calculates the total profits for a specific bond involved in the transaction.
 
@@ -838,7 +838,7 @@ class SecurityTx:
         net_profit = self.get_net_profit(bond_code)
 
         bond = self.daily_holded_bond(bond_code).copy()
-        capital = self.get_capital(bond_code)
+        capital = self.get_capital_gains(bond_code)
 
         # merge capital gains first
         if capital.empty:
@@ -866,6 +866,24 @@ class SecurityTx:
 
         mask = (bond[C.DATE] >= pd.to_datetime(self.start_time)) & (bond[C.DATE] <= pd.to_datetime(self.end_time))
         return bond.loc[mask, :]
+
+    def get_all_profit_data(self):
+
+        bonds_info = self.get_holded_bonds_info()
+
+        if bonds_info.empty:
+            return pd.DataFrame({})
+        bond_codes = bonds_info[C.BOND_CODE].tolist()
+        bond_all = pd.DataFrame({})
+
+        # 生成一个包含所有债券收益情况的DataFrame
+        for bond_code in bond_codes:
+            bond_all = pd.concat([bond_all, self.sum_profits(bond_code)], ignore_index=True)
+
+        # 补充债券代码和发行机构
+        bond_all = pd.merge(bond_all, bonds_info[[C.BOND_CODE, C.ISSUE_ORG]], on=C.BOND_CODE, how='left')
+
+        return bond_all
 
 
 class CDTx(SecurityTx):
