@@ -217,6 +217,10 @@ class Constants:
     CAPITAL_OCCUPY = 'capital_occupy'
     # 累计资金占用
     CAPITAL_OCCUPY_CUM = 'capital_occupy_cum'
+    # 托管市场（利率债，信用债）
+    BOND_CUST = 'bond_cust'
+    # 利率债代码
+    INST_BOND_NUM = {0, 1, 6, 11}
 
 
 @st.cache_resource

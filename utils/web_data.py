@@ -258,6 +258,49 @@ class SecurityDataHandler:
 
         return self.raw
 
+    def get_holded_bonds_endtime(self) -> pd.DataFrame:
+        """
+        返回在统计区间末时点的持有债券数据
+        :return: 在统计区间末时点的持有债券数据
+        """
+
+        holded = self.tx.get_holded_bonds_endtime()
+        bond_info = self.tx.get_holded_bonds_info()
+
+        if bond_info.empty:
+            return pd.DataFrame({})
+
+        holded = pd.merge(holded, bond_info[[C.BOND_CODE, C.BOND_TYPE, C.COUPON_RATE_ISSUE, C.COUPON_RATE_CURRENT,
+                                             C.ISSUE_AMT, C.ISSUE_PRICE, C.ISSUE_ORG, C.MATURITY]],
+                          on=C.BOND_CODE,
+                          how='left')
+
+        return holded
+
+    def get_inst_bonds(self, bonds: pd.DataFrame) -> pd.DataFrame:
+        """
+        返回bonds中的利率债
+
+        Returns
+        -------
+        pd.DataFrame
+            bonds中的利率债
+        """
+
+        return bonds[bonds[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)]
+
+    def get_credit_bonds(self, bonds: pd.DataFrame) -> pd.DataFrame:
+        """
+        返回bonds中的信用债
+
+        Returns
+        -------
+        pd.DataFrame
+            bonds中的信用债
+        """
+
+        return bonds[~bonds[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)]
+
     def daily_yield_all(self) -> pd.DataFrame:
 
         """
@@ -576,7 +619,7 @@ class SecurityDataHandler:
     def yield_data_format(raw_data: List[pd.DataFrame], start_time: datetime.date, end_time: datetime.date,
                           columns: List[str]) -> pd.DataFrame:
         """
-        将收益数据格式化，更好的展示到web页面上
+        将收益数据格式化，更好的展示到web页面的dataframe上
         :param raw_data: 收益数据的集合，每个元素为一个DataFrame，每个DataFrame为一个分组的收益数据
         :param start_time: 开始时间
         :param end_time: 结束时间

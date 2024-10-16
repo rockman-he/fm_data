@@ -1,3 +1,6 @@
 .idea
 .streamlit
 /test/*
+__pycache__/
+/uml
+

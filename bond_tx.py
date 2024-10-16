@@ -215,6 +215,9 @@ class SecurityTx:
     def get_holded_bonds(self) -> pd.DataFrame:
         return self.holded
 
+    def get_holded_bonds_endtime(self) -> pd.DataFrame:
+        return self.holded[self.holded[C.DATE].dt.date == self.end_time]
+
     def get_request_distributions(self) -> pd.DataFrame:
         return self.request
 
