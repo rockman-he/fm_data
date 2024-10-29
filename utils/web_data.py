@@ -301,6 +301,47 @@ class SecurityDataHandler:
 
         return bonds[~bonds[C.BOND_TYPE_NUM].isin(self.inst_rate_bond)]
 
+    def get_all_trades(self) -> pd.DataFrame:
+        """
+        返回所有交易数据
+
+        Returns
+        -------
+        pd.DataFrame
+            所有交易数据
+        """
+        primary_trades = self.tx.get_primary_trades()
+        secondary_trades = self.tx.get_secondary_trades()
+
+        if primary_trades.empty and secondary_trades.empty:
+            return pd.DataFrame({})
+
+        primary_trades[C.TRADE_TYPE] = '一级'
+        secondary_trades[C.TRADE_TYPE] = '二级'
+
+        all_trades = pd.concat([secondary_trades, primary_trades], ignore_index=True)
+
+        mask = all_trades[C.TRADE_TYPE] == '一级'
+        all_trades.loc[mask, C.SETTLE_AMT] = all_trades.loc[mask, C.NET_PRICE] * all_trades.loc[
+            mask, C.BOND_AMT_CASH] / 100
+
+        all_trades.loc[mask, C.FULL_PRICE] = all_trades.loc[mask, C.NET_PRICE]
+        all_trades.loc[mask, C.ACCRUED_INST_CASH] = 0
+        all_trades.loc[mask, C.TRADE_AMT] = all_trades.loc[mask, C.SETTLE_AMT]
+        # all_trades.loc[mask, C.TRADE_AMT] = all_trades.loc[mask, C.NET_PROFIT]
+
+        mask = all_trades[C.DIRECTION] == 1
+
+        # Ensure the column is of type object (string) before assignment
+        all_trades[C.DIRECTION] = all_trades[C.DIRECTION].astype(str)
+
+        all_trades.loc[mask, C.DIRECTION] = '买入'
+        all_trades.loc[~mask, C.DIRECTION] = '卖出'
+
+        all_trades.drop(columns=[C.BOND_TYPE_NUM], inplace=True)
+
+        return all_trades
+
     def daily_yield_all(self) -> pd.DataFrame:
 
         """

@@ -123,6 +123,7 @@ class SecurityTx:
         if not bond_type.empty:
 
             if not self.request.empty:
+                self.request = self.request.reset_index(drop=False)
                 self.request = pd.merge(self.request, bond_type, on=C.BOND_CODE, how='left')
 
             if not self.trades.empty:
@@ -218,10 +219,10 @@ class SecurityTx:
     def get_holding_bonds_endtime(self) -> pd.DataFrame:
         return self.holded[self.holded[C.DATE].dt.date == self.end_time]
 
-    def get_request_distributions(self) -> pd.DataFrame:
+    def get_primary_trades(self) -> pd.DataFrame:
         return self.request
 
-    def get_all_trades(self) -> pd.DataFrame:
+    def get_secondary_trades(self) -> pd.DataFrame:
         return self.trades
 
     def get_inst_cash_flow_all(self) -> pd.DataFrame:

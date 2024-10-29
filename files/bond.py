@@ -61,8 +61,9 @@ if option == '收益测算':
 
     if txn is not None and not dh.get_raw().empty:
 
+        st.divider()
+
         st.write("#### 区间收益")
-        st.write("###  ")
 
         daily_all_cum = dh.period_yield_all_cum(start_time, end_time)
         daily_all_cum[C.BOND_TYPE] = '全部债券'
@@ -102,12 +103,11 @@ if option == '收益测算':
                     st.expander('详细数据').write(daily_credit_cum)
 
 
-        # 区间收益图表
-        yield_chart()
-
         # 在start_time, end_time期间，累计持仓X支债券，日均债券持仓X元，日均资金占用X元，实现利息收入X元，净价浮盈X元，资本利得X元，总收益X元，区间收益率X%。
-        st.markdown(f"##### {start_time}-{end_time}期间：")
+        # st.markdown(f"##### {start_time}-{end_time}期间：")
         # st.dataframe(daily_all_cum)
+        st.markdown("###### ")
+
         st.write(f"**日均债券持仓**: {daily_all_cum[C.HOLD_AMT].sum() / len(daily_all_cum):,.2f} 元")
         st.write(f"**日均资金占用**: {daily_all_cum[C.CAPITAL_OCCUPY].sum() / len(daily_all_cum):,.2f} 元")
         st.write(f"**利息收入**: {daily_all_cum[C.INST_A_DAY].sum():,.2f} 元")
@@ -115,6 +115,10 @@ if option == '收益测算':
         st.write(f"**资本利得**: {daily_all_cum.iloc[-1][C.CAPITAL_GAINS_CUM]:,.2f} 元")
         st.write(f"**总收益**: {daily_all_cum.iloc[-1][C.TOTAL_PROFIT_CUM]:,.2f} 元")
         st.write(f"**区间收益率**: {daily_all_cum.iloc[-1][C.YIELD_CUM]:.4f}%")
+
+        st.divider()
+        # 区间收益图表
+        yield_chart()
 
         st.divider()
 
@@ -165,7 +169,8 @@ if option == '收益测算':
 
 if option == '业务统计':
     if txn is not None and not dh.get_raw().empty:
-        st.write("#### 持仓债券概览")
+        st.divider()
+        st.write("#### 持仓概览")
         holded_bonds = dh.get_holding_bonds_endtime()
 
         # st.dataframe(holded_bonds, use_container_width=True)
@@ -224,12 +229,15 @@ if option == '业务统计':
                 C.COUPON_RATE_ISSUE: "{:.2%}",
                 C.COUPON_RATE_CURRENT: "{:.2%}"
             })
+
+            st.divider()
+
             st.markdown("#### 持仓债券基础信息")
             st.dataframe(output, use_container_width=True,
                          hide_index=True,
                          column_config={
                              C.BOND_CODE: '债券代码',
-                             C.BOND_NAME: '债券名称',
+                             C.BOND_NAME: '债券简称',
                              C.BOND_CUST: '托管市场',
                              C.MARKET_CODE: '交易市场',
                              C.HOLD_AMT: '持仓面额（元）',
@@ -245,3 +253,41 @@ if option == '业务统计':
                          })
         else:
             st.write("期末无持仓")
+
+        st.divider()
+
+        st.markdown("#### 交易记录")
+        all_trades = dh.get_all_trades()
+
+        if not all_trades.empty:
+
+            all_trades = all_trades.style.format({
+                C.DATE: "{:%Y-%m-%d}",
+                C.NET_PRICE: "{:.4f}",
+                C.FULL_PRICE: "{:.4f}",
+                C.BOND_AMT_CASH: "{:,.2f}",
+                C.ACCRUED_INST_CASH: "{:,.2f}",
+                C.TRADE_AMT: "{:,.2f}",
+                C.SETTLE_AMT: "{:,.2f}"
+            })
+
+            st.dataframe(all_trades, use_container_width=True, hide_index=True,
+                         column_config={
+                             C.DATE: '交易日期',
+                             C.BOND_CODE: '债券代码',
+                             C.BOND_NAME: '债券简称',
+                             C.MARKET_CODE: '交易市场',
+                             C.DIRECTION: '交易方向',
+                             C.BOND_AMT_CASH: '交易面额（元）',
+                             C.NET_PRICE: '交易净价',
+                             C.ACCRUED_INST_CASH: '应计利息（元）',
+                             C.TRADE_AMT: '交易金额（元）',
+                             C.SETTLE_AMT: '结算金额（元）',
+                             C.TRADE_TYPE: '交易类型',
+                             C.FULL_PRICE: '交易全价'
+                         })
+        else:
+            st.write("无交易记录")
+
+    else:
+        st.write("无数据")

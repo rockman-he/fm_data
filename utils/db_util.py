@@ -151,6 +151,8 @@ class Constants:
     WEIGHT_NET_PRICE = 'tradeweightclnprc'
     # 组合编号
     PORTFOLIO_NO = 'portfoliono'
+    # 交易类型，一级或者二级
+    TRADE_TYPE = 'tradetype'
 
     # ------------------------自定义市场利率字段------------------------
 

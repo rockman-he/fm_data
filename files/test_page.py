@@ -90,10 +90,10 @@ if txn is not None:
     st.write('### 资本利得')
     st.write('#### 交易记录')
     st.write('#### 一级申购，request_distributions()')
-    st.dataframe(txn.get_request_distributions())
+    st.dataframe(txn.get_primary_trades())
 
     st.write('#### 二级交易, get_all_trades()')
-    st.dataframe(txn.get_all_trades())
+    st.dataframe(txn.get_secondary_trades())
 
     st.write('#### 资本利得, get_capital_all()')
     st.dataframe(txn.get_capital_all(), use_container_width=True)
