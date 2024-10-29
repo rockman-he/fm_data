@@ -258,13 +258,13 @@ class SecurityDataHandler:
 
         return self.raw
 
-    def get_holded_bonds_endtime(self) -> pd.DataFrame:
+    def get_holding_bonds_endtime(self) -> pd.DataFrame:
         """
-        返回在统计区间末时点的持有债券数据
+        返回在统计区间末时点的持有债券数据，额外包含了债券基础信息
         :return: 在统计区间末时点的持有债券数据
         """
 
-        holded = self.tx.get_holded_bonds_endtime()
+        holded = self.tx.get_holding_bonds_endtime()
         bond_info = self.tx.get_holded_bonds_info()
 
         if bond_info.empty:
@@ -486,7 +486,7 @@ class SecurityDataHandler:
 
         return self.cal_period_yield_cum(self.daily_yield_credit_bond(), start_time, end_time)
 
-    # todo 1.1 保留单日收益率计算，留以后结合负债做收益计算
+    # 1.1 保留单日收益率计算，留以后结合负债做收益计算
     @staticmethod
     def cal_daily_yield(bond_data: pd.DataFrame) -> pd.DataFrame:
 
@@ -513,7 +513,7 @@ class SecurityDataHandler:
             C.NET_PROFIT: lambda x: x.sum(),
             C.TOTAL_PROFIT: lambda x: x.sum()
         })
-        # todo 1.1.1 每日收益率计算
+        # 1.1.1 每日收益率计算
         raw_group[C.YIELD] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS] + raw_group[C.NET_PROFIT])
                               / raw_group[C.CAPITAL_OCCUPY] * 100)
         raw_group[C.YIELD_NO_NET_PROFIT] = (((raw_group[C.INST_A_DAY] * 365) + raw_group[C.CAPITAL_GAINS]) /

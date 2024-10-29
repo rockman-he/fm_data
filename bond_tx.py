@@ -215,7 +215,7 @@ class SecurityTx:
     def get_holded_bonds(self) -> pd.DataFrame:
         return self.holded
 
-    def get_holded_bonds_endtime(self) -> pd.DataFrame:
+    def get_holding_bonds_endtime(self) -> pd.DataFrame:
         return self.holded[self.holded[C.DATE].dt.date == self.end_time]
 
     def get_request_distributions(self) -> pd.DataFrame:
@@ -233,7 +233,7 @@ class SecurityTx:
     def get_capital_all(self) -> pd.DataFrame:
         return self.capital
 
-    # todo 1.1 全量利息现金流获取
+    # 1.1 全量利息现金流获取
     def _inst_cash_flow_all(self) -> pd.DataFrame:
 
         """
@@ -277,7 +277,7 @@ class SecurityTx:
 
         return raw
 
-    # todo 1.2 单只债券利息现金流
+    # 1.2 单只债券利息现金流
     def get_inst_flow(self, bond_code: str) -> pd.DataFrame:
 
         """
@@ -325,7 +325,7 @@ class SecurityTx:
 
         return inst_daily
 
-    # todo 2.1 全量估值获取
+    # 2.1 全量估值获取
     def _daily_value_all(self) -> pd.DataFrame:
 
         """
@@ -368,7 +368,7 @@ class SecurityTx:
 
         return raw
 
-    # todo 2.2 获取单支债券估值，注意源源数据库部分债券数据缺失不全
+    # 2.2 获取单支债券估值，注意源源数据库部分债券数据缺失不全
     def get_daily_value(self, bond_code: str) -> pd.DataFrame:
 
         """
@@ -648,7 +648,7 @@ class SecurityTx:
         else:
             return pd.concat([bank, exchange], ignore_index=True)
 
-    # todo 3.1 全量资本利得获取
+    # 3.1 全量资本利得获取
     def _capital_gains_all(self) -> pd.DataFrame:
         """
         Retrieves the capital of all bonds involved in the transaction from the database.
@@ -687,7 +687,7 @@ class SecurityTx:
         # Create a copy of self.holded to avoid modifying the original DataFrame
         holded_copy = self.holded.copy()
 
-        # todo 3.2 从C.DATE列加一天，获取前一天的净成本价
+        # 3.2 从C.DATE列加一天，获取前一天的净成本价
         # add one day from the C.DATE column，get previous day's net cost price
         holded_copy[C.DATE] = holded_copy[C.DATE] + pd.Timedelta(days=1)
 
@@ -696,14 +696,14 @@ class SecurityTx:
                              holded_copy[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
                              on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
 
-        # todo 3.3 理论上前一天的成本净价没有空值，但是源数据库数据有问题(20161219,160010)，暂时做此处理
+        # 3.3 理论上前一天的成本净价没有空值，但是源数据库数据有问题(20161219,160010)，暂时做此处理
         raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)
 
         return raw_group
 
-    # todo 4.1 计算单只债券的利息
+    # 4.1 计算单只债券的利息
     def get_daily_insts(_self, bond_code: str) -> pd.DataFrame:
 
         """
@@ -741,7 +741,7 @@ class SecurityTx:
 
         return raw_inst
 
-    # todo 4.2 计算单只债券的资本利得
+    # 4.2 计算单只债券的资本利得
     def get_capital_gains(self, bond_code: str) -> pd.DataFrame:
 
         """
@@ -770,7 +770,7 @@ class SecurityTx:
 
         return capital
 
-    # todo 4.3 计算单只债券的净价浮盈
+    # 4.3 计算单只债券的净价浮盈
     def get_net_profit(_self, bond_code: str) -> pd.DataFrame:
 
         """
@@ -808,7 +808,7 @@ class SecurityTx:
 
         return raw_value
 
-    # todo 4.4 计算单只债券的总收益
+    # 4.4 计算单只债券的总收益
     def sum_profits(self, bond_code: str) -> pd.DataFrame:
         """
         Calculates the total profits for a specific bond involved in the transaction.
@@ -864,7 +864,7 @@ class SecurityTx:
         bond[columns_with_none] = bond[columns_with_none].astype(float).fillna(0)
         # 计算总收益
         bond[C.TOTAL_PROFIT] = bond[C.CAPITAL_GAINS] + bond[C.INST_A_DAY] + bond[C.NET_PROFIT]
-        # todo 4.4.1 资金占用
+        # 4.4.1 资金占用
         bond[C.CAPITAL_OCCUPY] = bond[C.HOLD_AMT] * bond[C.COST_FULL_PRICE] / 100
 
         mask = (bond[C.DATE] >= pd.to_datetime(self.start_time)) & (bond[C.DATE] <= pd.to_datetime(self.end_time))

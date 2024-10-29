@@ -104,6 +104,18 @@ if option == '收益测算':
 
         # 区间收益图表
         yield_chart()
+
+        # 在start_time, end_time期间，累计持仓X支债券，日均债券持仓X元，日均资金占用X元，实现利息收入X元，净价浮盈X元，资本利得X元，总收益X元，区间收益率X%。
+        st.markdown(f"##### {start_time}-{end_time}期间：")
+        # st.dataframe(daily_all_cum)
+        st.write(f"**日均债券持仓**: {daily_all_cum[C.HOLD_AMT].sum() / len(daily_all_cum):,.2f} 元")
+        st.write(f"**日均资金占用**: {daily_all_cum[C.CAPITAL_OCCUPY].sum() / len(daily_all_cum):,.2f} 元")
+        st.write(f"**利息收入**: {daily_all_cum[C.INST_A_DAY].sum():,.2f} 元")
+        st.write(f"**净价浮盈**: {daily_all_cum.iloc[-1][C.NET_PROFIT_SUB]:,.2f} 元")
+        st.write(f"**资本利得**: {daily_all_cum.iloc[-1][C.CAPITAL_GAINS_CUM]:,.2f} 元")
+        st.write(f"**总收益**: {daily_all_cum.iloc[-1][C.TOTAL_PROFIT_CUM]:,.2f} 元")
+        st.write(f"**区间收益率**: {daily_all_cum.iloc[-1][C.YIELD_CUM]:.4f}%")
+
         st.divider()
 
         temple = {C.AVG_AMT: '日均债券持仓（元）',
@@ -124,8 +136,8 @@ if option == '收益测算':
         st.divider()
 
         st.markdown("#### 按债券类型分类")
-        st.dataframe(SecurityDataHandler.yield_data_format([daily_inst_cum, daily_credit_cum,
-                                                            daily_all_cum], start_time, end_time, [C.BOND_TYPE]),
+        st.dataframe(SecurityDataHandler.yield_data_format([daily_inst_cum, daily_credit_cum],
+                                                           start_time, end_time, [C.BOND_TYPE]),
                      use_container_width=True,
                      hide_index=True,
                      column_config={**{
@@ -153,65 +165,83 @@ if option == '收益测算':
 
 if option == '业务统计':
     if txn is not None and not dh.get_raw().empty:
-        st.write("#### 债券持仓(" + str(end_time) + ")")
-        holded_bonds = dh.get_holded_bonds_endtime()
+        st.write("#### 持仓债券概览")
+        holded_bonds = dh.get_holding_bonds_endtime()
 
-        holded_bonds.loc[holded_bonds[C.BOND_TYPE_NUM].isin(C.INST_BOND_NUM), C.BOND_CUST] = '利率债'
-        holded_bonds.loc[~holded_bonds[C.BOND_TYPE_NUM].isin(C.INST_BOND_NUM), C.BOND_CUST] = '信用债'
+        # st.dataframe(holded_bonds, use_container_width=True)
 
-        # 按发行人汇总
-        holded_org = holded_bonds.groupby(C.ISSUE_ORG).agg({C.HOLD_AMT: 'sum'}).reset_index()
-        # 按债券类型汇总
-        holded_type = holded_bonds.groupby(C.BOND_TYPE).agg({C.HOLD_AMT: 'sum'}).reset_index()
-        # 按交易市场分类
-        holded_market = holded_bonds.groupby(C.MARKET_CODE).agg({C.HOLD_AMT: 'sum'}).reset_index()
-        # 按托管市场分类
-        holded_cust = holded_bonds.groupby(C.BOND_CUST).agg({C.HOLD_AMT: 'sum'}).reset_index()
+        if not holded_bonds.empty:
+            holded_bonds.loc[holded_bonds[C.BOND_TYPE_NUM].isin(C.INST_BOND_NUM), C.BOND_CUST] = '利率债'
+            holded_bonds.loc[~holded_bonds[C.BOND_TYPE_NUM].isin(C.INST_BOND_NUM), C.BOND_CUST] = '信用债'
 
-        pie_bonds_org = pie_global(holded_org, C.ISSUE_ORG, C.HOLD_AMT, '按发行人分类')
-        pie_bonds_type = pie_global(holded_type, C.BOND_TYPE, C.HOLD_AMT, '按债券类型分类')
-        pie_bonds_market = pie_global(holded_market, C.MARKET_CODE, C.HOLD_AMT, '按交易市场分类')
-        pie_bonds_cust = pie_global(holded_cust, C.BOND_CUST, C.HOLD_AMT, '按托管市场分类')
+            # 按发行人汇总
+            holded_org = holded_bonds.groupby(C.ISSUE_ORG).agg({C.HOLD_AMT: 'sum'}).reset_index()
+            # 按债券类型汇总
+            holded_type = holded_bonds.groupby(C.BOND_TYPE).agg({C.HOLD_AMT: 'sum'}).reset_index()
+            # 按交易市场分类
+            holded_market = holded_bonds.groupby(C.MARKET_CODE).agg({C.HOLD_AMT: 'sum'}).reset_index()
+            # 按托管市场分类
+            holded_cust = holded_bonds.groupby(C.BOND_CUST).agg({C.HOLD_AMT: 'sum'}).reset_index()
 
-        x_one, x_two = st.columns([1, 1])
-        with x_one:
-            streamlit_echarts.st_pyecharts(pie_bonds_cust, height='250px')
-        with x_two:
-            streamlit_echarts.st_pyecharts(pie_bonds_org, height='250px')
+            # st.markdown(f"##### 截至{end_time}：")
+            # st.dataframe(daily_all_cum)
 
-        y_one, y_two = st.columns([1, 1])
-        with y_one:
-            streamlit_echarts.st_pyecharts(pie_bonds_type, height='250px')
-        with y_two:
-            streamlit_echarts.st_pyecharts(pie_bonds_market, height='250px')
+            inst_mask = holded_cust[C.BOND_CUST] == '利率债'
+            market_mask = holded_market[C.MARKET_CODE] == 'IB'
+            st.write(
+                f"截至{end_time}, **持仓面额** {holded_bonds[C.HOLD_AMT].sum() / 100000000:,.2f} 亿元, "
+                f"其中 **利率债** {holded_cust.loc[inst_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元, "
+                f" **信用债** {holded_cust.loc[~inst_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元, ",
+                f" **银行间市场** {holded_market.loc[market_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元, ",
+                f" **交易所市场** {holded_market.loc[~market_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元。"
+            )
+            st.markdown("#### ")
 
-        output = holded_bonds.drop(columns=[C.DATE, C.BOND_TYPE_NUM]).style.format({
-            C.HOLD_AMT: "{:,.2f}",
-            C.COST_NET_PRICE: "{:.4f}",
-            C.COST_FULL_PRICE: "{:.4f}",
-            C.ISSUE_AMT: "{:,.2f}",
-            C.ISSUE_PRICE: "{:.4f}",
-            C.MATURITY: "{:%Y-%m-%d}",
-            C.COUPON_RATE_ISSUE: "{:.2%}",
-            C.COUPON_RATE_CURRENT: "{:.2%}"
-        })
+            pie_bonds_org = pie_global(holded_org, C.ISSUE_ORG, C.HOLD_AMT, '按发行人分类')
+            pie_bonds_type = pie_global(holded_type, C.BOND_TYPE, C.HOLD_AMT, '按债券类型分类')
+            pie_bonds_market = pie_global(holded_market, C.MARKET_CODE, C.HOLD_AMT, '按交易市场分类')
+            pie_bonds_cust = pie_global(holded_cust, C.BOND_CUST, C.HOLD_AMT, '按托管市场分类')
 
-        st.dataframe(output, use_container_width=True,
-                     hide_index=True,
-                     column_config={
-                         C.BOND_CODE: '债券代码',
-                         C.BOND_NAME: '债券名称',
-                         C.BOND_CUST: '托管市场',
-                         C.MARKET_CODE: '交易市场',
-                         C.HOLD_AMT: '持仓金额（元）',
-                         C.COST_NET_PRICE: '成本净价',
-                         C.COST_FULL_PRICE: '成本全价',
-                         C.BOND_TYPE: '债券类型',
-                         C.ISSUE_ORG: '发行人',
-                         C.ISSUE_AMT: '发行量',
-                         C.ISSUE_PRICE: '发行价格',
-                         C.COUPON_RATE_ISSUE: '票面利率（发行）',
-                         C.COUPON_RATE_CURRENT: '票面利率（当期）',
-                         C.MATURITY: '到期日'
-                     })
-        # st.dataframe(txn.get_holded_bonds())
+            x_one, x_two = st.columns([1, 1])
+            with x_one:
+                streamlit_echarts.st_pyecharts(pie_bonds_cust, height='250px')
+            with x_two:
+                streamlit_echarts.st_pyecharts(pie_bonds_org, height='250px')
+
+            y_one, y_two = st.columns([1, 1])
+            with y_one:
+                streamlit_echarts.st_pyecharts(pie_bonds_type, height='250px')
+            with y_two:
+                streamlit_echarts.st_pyecharts(pie_bonds_market, height='250px')
+
+            output = holded_bonds.drop(columns=[C.DATE, C.BOND_TYPE_NUM]).style.format({
+                C.HOLD_AMT: "{:,.2f}",
+                C.COST_NET_PRICE: "{:.4f}",
+                C.COST_FULL_PRICE: "{:.4f}",
+                C.ISSUE_AMT: "{:,.2f}",
+                C.ISSUE_PRICE: "{:.4f}",
+                C.MATURITY: "{:%Y-%m-%d}",
+                C.COUPON_RATE_ISSUE: "{:.2%}",
+                C.COUPON_RATE_CURRENT: "{:.2%}"
+            })
+            st.markdown("#### 持仓债券基础信息")
+            st.dataframe(output, use_container_width=True,
+                         hide_index=True,
+                         column_config={
+                             C.BOND_CODE: '债券代码',
+                             C.BOND_NAME: '债券名称',
+                             C.BOND_CUST: '托管市场',
+                             C.MARKET_CODE: '交易市场',
+                             C.HOLD_AMT: '持仓面额（元）',
+                             C.COST_NET_PRICE: '成本净价',
+                             C.COST_FULL_PRICE: '成本全价',
+                             C.BOND_TYPE: '债券类型',
+                             C.ISSUE_ORG: '发行人',
+                             C.ISSUE_AMT: '发行量',
+                             C.ISSUE_PRICE: '发行价格',
+                             C.COUPON_RATE_ISSUE: '票面利率（发行）',
+                             C.COUPON_RATE_CURRENT: '票面利率（当期）',
+                             C.MATURITY: '到期日'
+                         })
+        else:
+            st.write("期末无持仓")
