@@ -641,6 +641,7 @@ class SecurityDataHandler:
         del daily_data_cum['non_zero']
 
         # 计算区间收益的值，基数按365天计算
+        # TODO 同业存单计算方式不同，后期待优化
         daily_data_cum[C.YIELD_CUM] = ((daily_data_cum[C.INST_DAYS] * 365 /
                                         daily_data_cum[C.WORK_DAYS] + daily_data_cum[C.CAPITAL_GAINS_CUM] +
                                         daily_data_cum[C.NET_PROFIT_SUB]) /

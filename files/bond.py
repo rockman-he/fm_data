@@ -122,7 +122,7 @@ if option == '收益测算':
 
         st.divider()
 
-        temple = {C.AVG_AMT: '日均债券持仓（元）',
+        temple = {C.AVG_AMT: '日均持仓（元）',
                   C.CAPITAL_OCCUPY: '日均资金占用（元）',
                   C.INTEREST_AMT: '利息收入（元）',
                   C.NET_PROFIT_SUB: '净价浮盈（元）',
@@ -135,7 +135,7 @@ if option == '收益测算':
                      hide_index=True,
                      column_config={**{
                          C.BOND_CODE: '债券代码',
-                         C.BOND_NAME: '债券名称'
+                         C.BOND_NAME: '债券简称'
                      }, **temple})
         st.divider()
 
@@ -165,7 +165,7 @@ if option == '收益测算':
                      }, **temple})
 
     else:
-        st.divider()
+        st.write('无数据')
 
 if option == '业务统计':
     if txn is not None and not dh.get_raw().empty:
