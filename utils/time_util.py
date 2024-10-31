@@ -3,7 +3,7 @@
 # FileName: utils
 # Description: This file contains utility functions and classes for the project.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 
 # TimeUtil class
@@ -54,11 +54,52 @@ class TimeUtil:
         # Return the start date of the current year and the start date of the last year
         return func_this_year_start, func_last_year_start
 
+    @staticmethod
+    def get_months_feday(year_num: int) -> list[tuple[date, date]]:
+        """
+        This function returns a list of tuples, each containing the start and end dates of each month in the specified year.
+
+        :param year_num: The year for which the monthly start and end dates are to be calculated.
+        :type year_num: int
+        :return: A list of tuples, where each tuple contains two date objects representing the start and end dates of a month.
+        :rtype: list[tuple[date, date]]
+        """
+
+        months = []
+        current_date = datetime.now()
+        current_year = current_date.year
+        current_month = current_date.month
+
+        if year_num < current_year:
+            for month in range(1, 13):
+                start_date = date(year_num, month, 1)
+                if month == 12:
+                    end_date = date(year_num + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(year_num, month + 1, 1) - timedelta(days=1)
+                months.append((start_date, end_date))
+        else:
+            for month in range(1, current_month + 1):
+                start_date = date(year_num, month, 1)
+                if month == current_month:
+                    end_date = current_date.date() - timedelta(days=1)
+                else:
+                    end_date = date(year_num, month + 1, 1) - timedelta(days=1)
+
+                if end_date < start_date:
+                    end_date = start_date
+
+                months.append((start_date, end_date))
+
+        return months
+
 
 if __name__ == '__main__':
     # Test the TimeUtil class
-    this_month_start, last_month_start, last_month_end = TimeUtil.get_current_and_last_month_dates(
-        datetime(2023, 1, 15))
-    print(f"This month starts on: {this_month_start}")
-    print(f"Last month starts on: {last_month_start}")
-    print(f"Last month ends on: {last_month_end}")
+    # this_month_start, last_month_start, last_month_end = TimeUtil.get_current_and_last_month_dates(
+    #     datetime(2023, 1, 15))
+    # print(f"This month starts on: {this_month_start}")
+    # print(f"Last month starts on: {last_month_start}")
+    # print(f"Last month ends on: {last_month_end}")
+
+    print(TimeUtil.get_months_feday(2023))

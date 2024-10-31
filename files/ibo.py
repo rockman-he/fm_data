@@ -24,7 +24,7 @@ st.set_page_config(page_title="拆借业务",
                    # 左边sidebar默认是展开的
                    initial_sidebar_state="expanded")
 
-st.markdown("## 🍳 拆借业务")
+st.markdown("##  拆借业务")
 st.divider()
 
 # 按时间段查询的form
@@ -68,7 +68,7 @@ else:
     fund_tx_header(dh)
 
     st.divider()
-    st.markdown("#### 🥇 每日余额利率情况")
+    st.markdown("###  每日余额利率情况")
     st.write("###  ")
 
     # 拆借业务的日均余额曲线
@@ -91,7 +91,7 @@ else:
     )
 
     st.divider()
-    st.markdown("#### 🚒 交易对手排名")
+    st.markdown("###  交易对手排名")
     st.markdown(" ")
 
     bar_party = bar_global(dh['partyn_total'], C.NAME,
@@ -104,7 +104,7 @@ else:
     )
 
     st.divider()
-    st.markdown("#### ⛪ 交易对手占比")
+    st.markdown("###  交易对手占比")
     st.markdown(" ")
 
     pie_party = pie_global(dh['party_n'], C.NAME, C.AVG_AMT, '日均余额(亿元）')
@@ -131,7 +131,7 @@ else:
                      })
 
     st.divider()
-    st.markdown("#### 🪟 期限分析")
+    st.markdown("###  期限分析")
     st.write("###  ")
 
     # x_data = dh['term'][C.TERM_TYPE].values.tolist()

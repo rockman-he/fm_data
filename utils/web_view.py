@@ -27,6 +27,8 @@ def fund_tx_header(datas: Dict) -> None:
                 '{:.2f}'.format(datas['holded'].loc[datas['holded'][C.WEIGHT_RATE] != 0, C.WEIGHT_RATE].min()))
     col3.metric("最低单笔利率（%）", '{:.2f}'.format(datas['occ'][C.MIN_RATE] * 100))
 
+    # st.dataframe(datas['holded'])
+
 
 def fund_line_global(df: pd.DataFrame, xaxis: str, yaxis: str, yaxis_name: str, color: str = "#37a2da", title="",
                      subtitle="") -> Line:

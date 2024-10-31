@@ -63,7 +63,7 @@ if option == '收益测算':
 
         st.divider()
 
-        st.write("#### 区间收益")
+        st.write("### 区间收益")
 
         daily_all_cum = dh.period_yield_all_cum(start_time, end_time)
         daily_all_cum[C.BOND_TYPE] = '全部债券'
@@ -130,7 +130,7 @@ if option == '收益测算':
                   C.TOTAL_PROFIT_CUM: '总收益（元）',
                   C.YIELD_CUM: '区间收益率（%）'}
 
-        st.markdown("#### 单支债券收益")
+        st.markdown("### 单支债券收益")
         st.dataframe(dh.yield_cum_by_code(start_time, end_time), use_container_width=True,
                      hide_index=True,
                      column_config={**{
@@ -139,7 +139,7 @@ if option == '收益测算':
                      }, **temple})
         st.divider()
 
-        st.markdown("#### 按债券类型分类")
+        st.markdown("### 按债券类型分类")
         st.dataframe(SecurityDataHandler.yield_data_format([daily_inst_cum, daily_credit_cum],
                                                            start_time, end_time, [C.BOND_TYPE]),
                      use_container_width=True,
@@ -149,7 +149,7 @@ if option == '收益测算':
                      }, **temple})
         st.divider()
 
-        st.markdown("#### 按交易市场分类")
+        st.markdown("### 按交易市场分类")
         st.dataframe(dh.yield_cum_by_market(start_time, end_time), use_container_width=True,
                      hide_index=True,
                      column_config={**{
@@ -157,7 +157,7 @@ if option == '收益测算':
                      }, **temple})
         st.divider()
 
-        st.markdown("#### 按发行人分类")
+        st.markdown("### 按发行人分类")
         st.dataframe(dh.yield_cum_by_org(start_time, end_time), use_container_width=True,
                      hide_index=True,
                      column_config={**{
@@ -170,7 +170,7 @@ if option == '收益测算':
 if option == '业务统计':
     if txn is not None and not dh.get_raw().empty:
         st.divider()
-        st.write("#### 持仓概览")
+        st.write("### 持仓概览")
         holded_bonds = dh.get_holding_bonds_endtime()
 
         # st.dataframe(holded_bonds, use_container_width=True)
@@ -200,7 +200,7 @@ if option == '业务统计':
                 f" **银行间市场** {holded_market.loc[market_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元, ",
                 f" **交易所市场** {holded_market.loc[~market_mask, C.HOLD_AMT].sum() / 100000000:,.2f} 亿元。"
             )
-            st.markdown("#### ")
+            st.markdown("### ")
 
             pie_bonds_org = pie_global(holded_org, C.ISSUE_ORG, C.HOLD_AMT, '按发行人分类')
             pie_bonds_type = pie_global(holded_type, C.BOND_TYPE, C.HOLD_AMT, '按债券类型分类')
@@ -232,7 +232,7 @@ if option == '业务统计':
 
             st.divider()
 
-            st.markdown("#### 持仓债券基础信息")
+            st.markdown("### 持仓债券基础信息")
             st.dataframe(output, use_container_width=True,
                          hide_index=True,
                          column_config={
@@ -256,7 +256,7 @@ if option == '业务统计':
 
         st.divider()
 
-        st.markdown("#### 交易记录")
+        st.markdown("### 交易记录")
         all_trades = dh.get_all_trades()
 
         if not all_trades.empty:

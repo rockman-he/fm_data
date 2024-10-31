@@ -4,6 +4,7 @@
 # Description: This module contains classes for handling security transactions, specifically for bonds and CDs.
 import datetime
 import pandas as pd
+from numpy import float64
 
 from utils.db_util import get_raw, create_conn
 from utils.db_util import Constants as C
@@ -313,6 +314,7 @@ class SecurityTx:
         inst_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE].copy()
         # 补充下缺失的日期
         inst_daily = inst_daily.set_index(C.DATE).resample('D').asfreq().reset_index()
+        inst_daily[C.INST_A_DAY] = 0.0
 
         # Calculate the daily cash flow for each date
         for row in bond.index:
@@ -324,6 +326,10 @@ class SecurityTx:
             # 由于计息天数等因素的差异，根据利息现金流分时间段赋值
             inst_daily.loc[inst_daily[C.DATE].isin(date_range), C.INST_A_DAY] = inst_a_day
 
+        # 将inst_daily[C.INST_A_DAY]中的缺失值填充为0
+        # inst_daily[C.INST_A_DAY] = inst_daily[C.INST_A_DAY].fillna(0.0).astype(float64)
+        # 查看inst_daily[C.INST_A_DAY]存储的值类型
+        # print(inst_daily[C.INST_A_DAY].dtype)
         return inst_daily
 
     # 2.1 全量估值获取
@@ -644,10 +650,16 @@ class SecurityTx:
         bank = self._bank_trades()
         exchange = self._exchange_trades()
 
+        if exchange.empty and bank.empty:
+            return pd.DataFrame({})
+
         if exchange.empty:
             return bank
-        else:
-            return pd.concat([bank, exchange], ignore_index=True)
+
+        if bank.empty:
+            return exchange
+
+        return pd.concat([bank, exchange], ignore_index=True)
 
     # 3.1 全量资本利得获取
     def _capital_gains_all(self) -> pd.DataFrame:
@@ -735,10 +747,19 @@ class SecurityTx:
             return pd.DataFrame({})
 
         inst = _self.get_inst_flow(bond_code)
+        # if inst.empty:
+        #     print(bond_code)
+        #     print(raw)
+
+        # 按照数据库设计的逻辑，当到期日的第二天为非工作日时，无利息流，但是仍然有持仓和资金占用
+        if inst.empty:
+            inst = pd.DataFrame(columns=[C.DATE, C.INST_A_DAY])
+            inst[C.DATE] = raw[C.DATE]
+            inst[C.INST_A_DAY] = 0.0
 
         raw_inst = pd.merge(raw, inst, on=C.DATE, how='left')
         raw_inst[C.INST_A_DAY] = (raw_inst[C.INST_A_DAY] * raw_inst[C.HOLD_AMT] / 100)
-        # raw_inst.fillna(0, inplace=True)
+        raw_inst.fillna(0, inplace=True)
 
         return raw_inst
 

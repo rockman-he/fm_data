@@ -62,7 +62,7 @@ option = st.sidebar.selectbox(
 if option == '收益测算':
 
     if txn is not None and not dh.get_raw().empty:
-        st.write("#### 区间收益")
+        st.write("### 区间收益")
         st.markdown("###### ")
 
         daily_cum = dh.period_yield_all_cum(start_time, end_time)
@@ -84,7 +84,7 @@ if option == '收益测算':
 
         st.divider()
 
-        st.markdown("#### 单支存单收益")
+        st.markdown("### 单支存单收益")
         temple = {C.AVG_AMT: '日均持仓（元）',
                   C.CAPITAL_OCCUPY: '日均资金占用（元）',
                   C.INTEREST_AMT: '利息收入（元）',
@@ -99,7 +99,7 @@ if option == '收益测算':
                          C.BOND_NAME: '存单简称'
                      }, **temple})
 
-        st.markdown("#### 按发行人分类")
+        st.markdown("### 按发行人分类")
         st.dataframe(dh.yield_cum_by_org(start_time, end_time), use_container_width=True,
                      hide_index=True,
                      column_config={**{
@@ -112,7 +112,7 @@ if option == '收益测算':
 if option == '业务统计':
     if txn is not None and not dh.get_raw().empty:
         st.divider()
-        st.write("#### 持仓概览")
+        st.write("### 持仓概览")
         holded_bonds = dh.get_holding_bonds_endtime()
 
         if not holded_bonds.empty:
@@ -138,7 +138,7 @@ if option == '业务统计':
             })
 
             st.divider()
-            st.markdown("#### 持仓存单基础信息")
+            st.markdown("### 持仓存单基础信息")
             st.dataframe(output, use_container_width=True,
                          hide_index=True,
                          column_config={
@@ -159,7 +159,7 @@ if option == '业务统计':
 
         st.divider()
 
-        st.markdown("#### 交易记录")
+        st.markdown("### 交易记录")
         all_trades = dh.get_all_trades()
 
         if not all_trades.empty:

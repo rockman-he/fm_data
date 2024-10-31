@@ -5,14 +5,16 @@
 # which provides methods for displaying transaction data on a web page.
 import datetime
 
-from typing import Dict, List
+from typing import Dict, List, Type
 
 import pandas as pd
 
 from bond_tx import SecurityTx
-from fund_tx import FundTx
+from fund_tx import FundTx, IBO
 from utils.db_util import Constants as C
 from utils.market_util import MarketUtil
+from utils.time_util import TimeUtil
+from utils.txn_factory import TxFactory
 
 
 # 将数据处理后显示到web页面上
@@ -45,7 +47,7 @@ class FundDataHandler:
         daily = self.tx.daily_data(self.tx.start_time, self.tx.end_time, self.tx.direction)
         market_irt = MarketUtil().get_irt(self.tx.start_time, self.tx.end_time)
 
-        if market_irt.empty:
+        if market_irt.empty or daily.empty:
             return daily
         else:
             return pd.merge(daily, market_irt, left_on=C.AS_DT, right_on=C.DATE, how='left')
@@ -216,6 +218,32 @@ class FundDataHandler:
 
         }
 
+    def get_summary(self) -> Dict:
+        """
+        Get the summary of the transaction.
+
+        This method retrieves the transaction header and packages it into a dictionary.
+
+        Returns:
+            Dict: The transaction summary.
+        """
+        # dh = {'party': pd.DataFrame({})}
+
+        dh = self.get_txn_header()
+
+        df = {
+            C.AVG_AMT: 0,
+            C.INST_DAYS: 0,
+            C.WEIGHT_RATE: 0
+        }
+
+        if not dh['partyn_total'].empty:
+            df[C.AVG_AMT] = dh['partyn_total'].loc[0, C.AVG_AMT]
+            df[C.INST_DAYS] = dh['partyn_total'].loc[0, C.INST_GROUP]
+            df[C.WEIGHT_RATE] = dh['partyn_total'].loc[0, C.WEIGHT_RATE]
+
+        return df
+
 
 class SecurityDataHandler:
     """
@@ -341,6 +369,34 @@ class SecurityDataHandler:
         all_trades.drop(columns=[C.BOND_TYPE_NUM], inplace=True)
 
         return all_trades
+
+    def get_summary(self, start_time: datetime.date, end_time: datetime.date) -> Dict:
+        """
+        Get the summary of the transaction.
+
+        This method retrieves the transaction header and packages it into a dictionary.
+
+        Returns:
+            Dict: The transaction summary.
+        """
+        # dh = {'party': pd.DataFrame({})}
+        dh = self.period_yield_all_cum(start_time, end_time)
+
+        df = {
+            C.AVG_AMT: 0,
+            C.INST_DAYS: 0,
+            C.CAPITAL_GAINS: 0,
+            C.WEIGHT_RATE: 0
+
+        }
+
+        if not dh.empty:
+            df[C.AVG_AMT] = dh[C.HOLD_AMT].sum() / len(dh)
+            df[C.INST_DAYS] = dh[C.INST_A_DAY].sum()
+            df[C.CAPITAL_GAINS] = dh.iloc[-1][C.CAPITAL_GAINS_CUM]
+            df[C.WEIGHT_RATE] = dh.iloc[-1][C.YIELD_CUM]
+
+        return df
 
     def daily_yield_all(self) -> pd.DataFrame:
 
@@ -698,3 +754,60 @@ class SecurityDataHandler:
             i = i + 1
 
         return df
+
+
+def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0) -> pd.DataFrame:
+    months = TimeUtil.get_months_feday(year_num)
+
+    data = []
+
+    for start_time, end_time in months:
+        txn = TxFactory(txn_type).create_txn(start_time, end_time, direction)
+        txn_data = FundDataHandler(txn).get_summary()
+
+        dict_data = {
+            C.DATE: start_time.strftime('%Y-%m'),
+            C.AVG_AMT: txn_data[C.AVG_AMT],
+            C.INST_DAYS: txn_data[C.INST_DAYS],
+            C.WEIGHT_RATE: txn_data[C.WEIGHT_RATE]
+        }
+
+        if direction == '正回购' or direction == '同业拆入':
+            days_interval = (end_time - start_time).days + 1
+            dict_data[C.INST_GROUP] = (txn_data[C.AVG_AMT] *
+                                       (mark_rate - txn_data[C.WEIGHT_RATE]) / 100 * days_interval / 365)
+
+        data.append(dict_data)
+
+    df = pd.DataFrame(data)
+    df.set_index(C.DATE, inplace=True)
+
+    return df
+
+
+def security_monthly_report(year_num: int, txn_type: Type[SecurityTx]) -> pd.DataFrame:
+    months = TimeUtil.get_months_feday(year_num)
+
+    data = []
+
+    for start_time, end_time in months:
+        txn_data = SecurityDataHandler(txn_type(start_time, end_time)).get_summary(start_time, end_time)
+
+        dict_data = {
+            C.DATE: start_time.strftime('%Y-%m'),
+            C.AVG_AMT: txn_data[C.AVG_AMT],
+            C.INST_DAYS: txn_data[C.INST_DAYS],
+            C.WEIGHT_RATE: txn_data[C.WEIGHT_RATE]
+        }
+
+        data.append(dict_data)
+
+    df = pd.DataFrame(data)
+    df.set_index(C.DATE, inplace=True)
+
+    return df
+
+
+if __name__ == '__main__':
+    df = fundtx_monthly_report(2023, IBO, '同业拆入', 0)
+    print(df)
