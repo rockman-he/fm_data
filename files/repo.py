@@ -2,6 +2,8 @@
 # CreateTime: 2024/7/15
 # FileName: repo.py
 # Description: 用于展示回购交易要素的页面
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
@@ -33,15 +35,17 @@ with st.form("tx"):
         start_time = st.date_input(
             "⏱起始时间",
             value=TimeUtil.get_current_and_last_month_dates()[1],
+            min_value=datetime(2013, 1, 1).date(),
             # 要明确每个组件的key，不然会共用一个组件
-            key='txn_start_time'
+            key='repo_start_time'
         )
 
     with txn_end_time:
         end_time = st.date_input(
             "⏱结束时间",
             value=TimeUtil.get_current_and_last_month_dates()[2],
-            key='txn_end_time'
+            min_value=datetime(2013, 1, 1).date(),
+            key='repo_end_time'
         )
 
     with txn_cps_type:

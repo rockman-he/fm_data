@@ -910,6 +910,12 @@ class SecurityTx:
 
         return bond_all
 
+    def get_stime(self) -> datetime.date:
+        return self.start_time
+
+    def get_etime(self) -> datetime.date:
+        return self.end_time
+
 
 class CDTx(SecurityTx):
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:

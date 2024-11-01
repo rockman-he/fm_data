@@ -66,7 +66,8 @@ class TimeUtil:
         """
 
         months = []
-        current_date = datetime.now()
+        # 时间截点为前一天的数据
+        current_date = datetime.now() - timedelta(days=1)
         current_year = current_date.year
         current_month = current_date.month
 

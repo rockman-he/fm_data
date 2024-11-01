@@ -2,6 +2,7 @@
 # CreateTime: 2024/8/15
 # FileName: bond
 # Description: simple introduction of the code
+from datetime import datetime
 
 import streamlit as st
 
@@ -33,15 +34,17 @@ with st.form("CD"):
         start_time = st.date_input(
             "⏱起始时间",
             value=TimeUtil.get_current_and_last_year()[0],
+            min_value=datetime(2013, 1, 1).date(),
             # 要明确每个组件的key，不然会共用一个组件
-            key='bond_start_time'
+            key='cd_start_time'
         )
 
     with txn_end_time:
         end_time = st.date_input(
             "⏱结束时间",
             value=TimeUtil.get_current_and_last_month_dates()[2],
-            key='bond_end_time'
+            min_value=datetime(2013, 1, 1).date(),
+            key='cd_end_time'
         )
 
     with txn_cps_type:

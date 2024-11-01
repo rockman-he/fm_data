@@ -9,12 +9,13 @@ from typing import Dict, List, Type
 
 import pandas as pd
 
-from bond_tx import SecurityTx
-from fund_tx import FundTx, IBO
+from bond_tx import SecurityTx, BondTx
+from fund_tx import FundTx
 from utils.db_util import Constants as C
 from utils.market_util import MarketUtil
 from utils.time_util import TimeUtil
 from utils.txn_factory import TxFactory
+from datetime import datetime
 
 
 # 将数据处理后显示到web页面上
@@ -218,31 +219,65 @@ class FundDataHandler:
 
         }
 
-    def get_summary(self) -> Dict:
+    def get_monthly_summary(self, mark_rate, flag) -> pd.DataFrame:
         """
-        Get the summary of the transaction.
-
-        This method retrieves the transaction header and packages it into a dictionary.
-
-        Returns:
-            Dict: The transaction summary.
+        按月度分组，返回统计数据
+        :param mark_rate: 用于计算套息的基准利率
+        :param flag: 交易方向，因数据库设计的方向不一致，这里额外做了一个标识
+        :return: df[C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]
         """
-        # dh = {'party': pd.DataFrame({})}
 
-        dh = self.get_txn_header()
+        start_time = self.tx.get_stime()
+        end_time = self.tx.get_etime()
+        direction = self.tx.get_dierection()
 
-        df = {
-            C.AVG_AMT: 0,
-            C.INST_DAYS: 0,
-            C.WEIGHT_RATE: 0
-        }
+        dh = self.tx.daily_data(start_time, end_time, direction)
 
-        if not dh['partyn_total'].empty:
-            df[C.AVG_AMT] = dh['partyn_total'].loc[0, C.AVG_AMT]
-            df[C.INST_DAYS] = dh['partyn_total'].loc[0, C.INST_GROUP]
-            df[C.WEIGHT_RATE] = dh['partyn_total'].loc[0, C.WEIGHT_RATE]
+        if dh.empty:
+            months = TimeUtil.get_months_feday(start_time.year)
 
-        return df
+            # 生成一个包含每个月最后一天的日期索引的DataFrame
+            dates = [end for _, end in months]
+            df = pd.DataFrame(index=dates, columns=[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE])
+            df[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]] = 0
+
+            return df
+
+        dh.set_index(C.AS_DT, inplace=True)
+        dh_monthly = dh.resample('ME').sum()
+
+        dh_monthly[C.AVG_AMT] = dh_monthly[C.REPO_AMT] / dh_monthly.index.days_in_month
+
+        dh_monthly[C.WEIGHT_RATE] = (dh_monthly[C.INST_DAYS] * 365 / dh_monthly.index.days_in_month /
+                                     dh_monthly[C.AVG_AMT]) * 100
+
+        dh_monthly.loc[dh_monthly[C.INST_DAYS] == 0, [C.WEIGHT_RATE, C.INST_GROUP]] = 0.0
+        dh_monthly.loc[:, C.INST_GROUP] = 0.0
+
+        if flag == '正回购' or flag == '同业拆入':
+            dh_monthly[C.INST_GROUP] = (dh_monthly[C.AVG_AMT] * (mark_rate - dh_monthly[C.WEIGHT_RATE]) /
+                                        100 * dh_monthly.index.days_in_month / 365)
+
+        last_row = dh_monthly.iloc[-1]
+        current_date = datetime.now()
+
+        # 如果是当前年，则要对最后一行的日均余额进行处理，否则会统计最后一个月的所有天数
+        if last_row.name.year == current_date.year and last_row.name.month == current_date.month:
+            # Calculate the number of days from the start of the month to the previous day
+            start_of_month = datetime(current_date.year, current_date.month, 1)
+            days_interval = ((current_date - datetime.timedelta(days=1)) - start_of_month.day + 1)
+            dh_monthly.iloc[-1][C.AVG_AMT] = dh_monthly[C.REPO_AMT] / days_interval
+
+            dh_monthly[C.WEIGHT_RATE] = (dh_monthly[C.INST_DAYS] * 365 / days_interval /
+                                         dh_monthly[C.AVG_AMT]) * 100
+
+            if flag == '正回购' or flag == '同业拆入':
+                dh_monthly[C.INST_GROUP] = (dh_monthly[C.AVG_AMT] * (mark_rate - dh_monthly[C.WEIGHT_RATE]) /
+                                            100 * days_interval / 365)
+
+        dh_monthly = dh_monthly[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]].rename_axis(C.DATE)
+
+        return dh_monthly
 
 
 class SecurityDataHandler:
@@ -397,6 +432,56 @@ class SecurityDataHandler:
             df[C.WEIGHT_RATE] = dh.iloc[-1][C.YIELD_CUM]
 
         return df
+
+    def get_monthly_summary(self) -> pd.DataFrame:
+        """
+        按月度分组，返回统计数据，用于“主页”显示
+        :return: df[C.DATE, C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]，这里的收益率是不含净价浮盈的
+        """
+
+        start_time = self.tx.get_stime()
+        end_time = self.tx.get_etime()
+
+        dh = self.period_yield_all_cum(start_time, end_time)
+        if dh.empty:
+            months = TimeUtil.get_months_feday(start_time.year)
+
+            # 生成一个包含每个月最后一天的日期索引的DataFrame
+            dates = [end for _, end in months]
+            df = pd.DataFrame(index=dates, columns=[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE])
+            df[[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]] = 0
+
+            return df
+
+        dh.set_index(C.DATE, inplace=True)
+        dh_monthly = dh.resample('ME').sum()
+
+        dh_monthly[C.AVG_AMT] = dh_monthly[C.HOLD_AMT] / dh_monthly.index.days_in_month
+
+        dh_monthly[C.WEIGHT_RATE] = ((dh_monthly[C.INST_A_DAY] * 365 +
+                                      dh_monthly[C.CAPITAL_GAINS] * dh_monthly.index.days_in_month) /
+                                     dh_monthly[C.CAPITAL_OCCUPY]) * 100
+
+        dh_monthly.loc[(dh_monthly[C.INST_A_DAY] + dh_monthly[C.CAPITAL_GAINS]) == 0, C.WEIGHT_RATE] = 0
+
+        last_row = dh_monthly.iloc[-1]
+        current_date = datetime.now()
+
+        # 如果是当前年，则要对最后一行的日均余额进行处理，否则会统计最后一个月的所有天数
+        if last_row.name.year == current_date.year and last_row.name.month == current_date.month:
+            # Calculate the number of days from the start of the month to the previous day
+            start_of_month = datetime(current_date.year, current_date.month, 1)
+            days_interval = ((current_date - datetime.timedelta(days=1)) - start_of_month.day + 1)
+            dh_monthly.iloc[-1][C.AVG_AMT] = dh_monthly[C.HOLD_AMT] / days_interval
+
+            dh_monthly[C.WEIGHT_RATE] = ((dh_monthly[C.INST_A_DAY] * 365 +
+                                          dh_monthly[C.CAPITAL_GAINS] * days_interval) /
+                                         dh_monthly[C.CAPITAL_OCCUPY]) * 100
+
+        dh_monthly = dh_monthly[[C.AVG_AMT, C.INST_A_DAY, C.CAPITAL_GAINS, C.WEIGHT_RATE]].rename(
+            columns={C.INST_A_DAY: C.INST_DAYS}).rename_axis(C.DATE)
+
+        return dh_monthly
 
     def daily_yield_all(self) -> pd.DataFrame:
 
@@ -758,56 +843,28 @@ class SecurityDataHandler:
 
 def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0) -> pd.DataFrame:
     months = TimeUtil.get_months_feday(year_num)
+    # print(months)
+    start_time = months[0][0]
+    end_time = months[-1][1]
 
-    data = []
+    txn = TxFactory(txn_type).create_txn(start_time, end_time, direction)
+    txn_data = FundDataHandler(txn).get_monthly_summary(mark_rate, direction)
 
-    for start_time, end_time in months:
-        txn = TxFactory(txn_type).create_txn(start_time, end_time, direction)
-        txn_data = FundDataHandler(txn).get_summary()
-
-        dict_data = {
-            C.DATE: start_time.strftime('%Y-%m'),
-            C.AVG_AMT: txn_data[C.AVG_AMT],
-            C.INST_DAYS: txn_data[C.INST_DAYS],
-            C.WEIGHT_RATE: txn_data[C.WEIGHT_RATE]
-        }
-
-        if direction == '正回购' or direction == '同业拆入':
-            days_interval = (end_time - start_time).days + 1
-            dict_data[C.INST_GROUP] = (txn_data[C.AVG_AMT] *
-                                       (mark_rate - txn_data[C.WEIGHT_RATE]) / 100 * days_interval / 365)
-
-        data.append(dict_data)
-
-    df = pd.DataFrame(data)
-    df.set_index(C.DATE, inplace=True)
-
-    return df
+    return txn_data
 
 
 def security_monthly_report(year_num: int, txn_type: Type[SecurityTx]) -> pd.DataFrame:
     months = TimeUtil.get_months_feday(year_num)
+    # print(months)
+    start_time = months[0][0]
+    end_time = months[-1][1]
 
-    data = []
+    txn_data = SecurityDataHandler(txn_type(start_time, end_time)).get_monthly_summary()
 
-    for start_time, end_time in months:
-        txn_data = SecurityDataHandler(txn_type(start_time, end_time)).get_summary(start_time, end_time)
-
-        dict_data = {
-            C.DATE: start_time.strftime('%Y-%m'),
-            C.AVG_AMT: txn_data[C.AVG_AMT],
-            C.INST_DAYS: txn_data[C.INST_DAYS],
-            C.WEIGHT_RATE: txn_data[C.WEIGHT_RATE]
-        }
-
-        data.append(dict_data)
-
-    df = pd.DataFrame(data)
-    df.set_index(C.DATE, inplace=True)
-
-    return df
+    return txn_data
 
 
 if __name__ == '__main__':
-    df = fundtx_monthly_report(2023, IBO, '同业拆入', 0)
+    # df = fundtx_monthly_report(2023, IBO, '同业拆入', 0)
+    df = security_monthly_report(2023, BondTx)
     print(df)

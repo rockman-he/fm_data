@@ -2,6 +2,7 @@
 # CreateTime: 2024/7/15
 # FileName: 1_🏻_拆借业务.py
 # Description: 用于展示拆借交易要素的页面
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -34,6 +35,7 @@ with st.form("ibo"):
         start_time = st.date_input(
             "⏱起始时间",
             value=TimeUtil.get_current_and_last_month_dates()[1],
+            min_value=datetime(2013, 1, 1).date(),
             # 要明确每个组件的key，不然会共用一个组件
             key='ibo_start_time'
         )
@@ -42,6 +44,7 @@ with st.form("ibo"):
         end_time = st.date_input(
             "⏱结束时间",
             value=TimeUtil.get_current_and_last_month_dates()[2],
+            min_value=datetime(2013, 1, 1).date(),
             key='ibo_end_time'
         )
 

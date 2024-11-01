@@ -134,6 +134,8 @@ class FundTx:
         daily[C.WEIGHT_RATE] = daily[C.INST_DAYS] * _self.inst_base / daily[C.TRADE_AMT] * 100
         daily[C.WEIGHT_RATE] = daily[C.WEIGHT_RATE].fillna(0)
 
+        # print(daily.columns)
+
         return daily
 
     # 交易对手排名
@@ -222,6 +224,15 @@ class FundTx:
         term_type.sort_values(by=C.AVG_AMT, ascending=False, inplace=True)
         term_type.reset_index(inplace=True)
         return term_type
+
+    def get_stime(self):
+        return self.start_time
+
+    def get_etime(self):
+        return self.end_time
+
+    def get_dierection(self):
+        return self.direction
 
 
 class Repo(FundTx):
