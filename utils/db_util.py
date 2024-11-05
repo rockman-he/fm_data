@@ -9,7 +9,7 @@ import streamlit as st
 
 class Constants:
     """
-    This class is used to store constant values related to database fields and custom fields for projects.
+    项目用到的常量
     """
 
     # ------------------------数据仓库字段------------------------
@@ -228,21 +228,22 @@ class Constants:
 @st.cache_resource
 def create_conn(db=Constants.COMP_DBNAME) -> st.connection:
     """
-    Create a connection to the database.
+    建立一个数据库对象
 
-    :param db: Database name, defaults to 'upsrod'
-    :return: Connection object
+    :param db: 数据库名，默认为'upsrod'
+    :return: 数据库对象
     """
-    return st.connection(db, type='sql', ttl=600, max_entries=20)
+    return st.connection(db, type='sql', ttl=600, max_entries=40)
 
 
 @st.cache_data
 def get_raw(_conn: st.connection, sql: str) -> pd.DataFrame:
     """
-    Query raw data from the database.
+    从数据库中查询数据
 
-    :param _conn: Database connection object
-    :param sql: SQL query string
-    :return: DataFrame containing the queried data
+    :param _conn: 数据库对象
+    :param sql: SQL查询语句
+    :return: 查询到的数据
     """
+
     return _conn.query(sql)

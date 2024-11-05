@@ -64,12 +64,12 @@ option = st.sidebar.selectbox(
 
 if option == '收益测算':
 
-    if txn is not None and not dh.get_raw().empty:
+    if txn is not None and not dh.raw.empty:
         st.write("### 区间收益")
         st.markdown("###### ")
 
         daily_cum = dh.period_yield_all_cum(start_time, end_time)
-        st.write(f"**日均债券持仓**: {daily_cum[C.HOLD_AMT].sum() / len(daily_cum):,.2f} 元")
+        st.write(f"**日均存单持仓**: {daily_cum[C.HOLD_AMT].sum() / len(daily_cum):,.2f} 元")
         st.write(f"**日均资金占用**: {daily_cum[C.CAPITAL_OCCUPY].sum() / len(daily_cum):,.2f} 元")
         st.write(f"**利息收入**: {daily_cum[C.INST_A_DAY].sum():,.2f} 元")
         st.write(f"**净价浮盈**: {daily_cum.iloc[-1][C.NET_PROFIT_SUB]:,.2f} 元")
@@ -113,7 +113,7 @@ if option == '收益测算':
         st.write('无数据')
 
 if option == '业务统计':
-    if txn is not None and not dh.get_raw().empty:
+    if txn is not None and not dh.raw.empty:
         st.divider()
         st.write("### 持仓概览")
         holded_bonds = dh.get_holding_bonds_endtime()

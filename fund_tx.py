@@ -3,34 +3,32 @@
 # FileName: transaction
 # Description: This module contains classes for handling transactions.
 import datetime
-from typing import Dict
 
 import pandas as pd
-import streamlit as st
 
 from utils.db_util import Constants as C, create_conn, get_raw
 
 
 class FundTx:
     """
-    This is an abstract base class for repo and ibo transactions.
+    这是一个用于 repo 和 ibo 交易的抽象基类。Repo和IBO类继承自该类。
 
     Attributes:
-        start_time (datetime.date): The start time of the transaction.
-        end_time (datetime.date): The end time of the transaction.
-        direction (str): The direction of the transaction.
-        inst_base (int): The base for calculating interest.
-        raw (pd.DataFrame): The raw data for the transaction.
+        start_time (datetime.date): 交易开始时间.
+        end_time (datetime.date): 交易截止统计时间（含）.
+        direction (str): 交易方向.
+        inst_base (int): 计息计算基数.
+        raw (pd.DataFrame): 交易数据.
     """
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
         """
-        Initialize a FundTx instance.
+        FundTx的构造函数.
 
         Args:
-            start_time (datetime.date): The start time of the transaction.
-            end_time (datetime.date): The end time of the transaction.
-            direction (str): The direction of the transaction.
+            start_time (datetime.date): 交易的开始时间.
+            end_time (datetime.date): 交易截止统计时间（含）.
+            direction (str): 交易方向.
         """
         self.start_time = start_time
         self.end_time = end_time
@@ -40,16 +38,16 @@ class FundTx:
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
-        Retrieve raw data from the database.
+        从数据库获取原始数据.
 
         Args:
-            sql (str): The SQL query to execute.
+            sql (str): sql语句.
 
         Returns:
-            pd.DataFrame: The raw data retrieved from the database.
+            pd.DataFrame: 数据库获取的交易数据.
         """
 
-        # 如果用户选择的截至时间晚于起始时间，则返回空df
+        # 如果用户选择的截止统计时间晚于起始时间，则返回空df
         if self.start_time > self.end_time:
             return pd.DataFrame({})
 
@@ -85,125 +83,125 @@ class FundTx:
                             * raw[C.WORK_DAYS])
         raw[C.INST_A_DAY] = raw[C.INTEREST_AMT] / raw[C.HOLDING_DAYS]
 
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw)
+
         return raw
 
-    @st.cache_data
-    # start_time, end_time, direciton仅为缓存机制用的key
-    def daily_data(_self, start_time: datetime.date, end_time: datetime.date, direction: str) -> pd.DataFrame:
+    def daily_data(self) -> pd.DataFrame:
         """
-        Retrieve holded data for the transaction.
-
-        Args:
-            start_time (datetime.date): The start time for retrieving the data.
-            end_time (datetime.date): The end time for retrieving the data.
-            direction (str): The direction of the transaction.
+        获取统计区间内每日持仓的统计数据.
 
         Returns:
-            pd.DataFrame: The holded data for the transaction.
+            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
         """
 
-        # 仅仅是为了消除参数未用的警告
-        start_time + datetime.timedelta(days=1)
-        end_time + datetime.timedelta(days=1)
-        len(direction)
-
-        if _self.raw.empty:
+        if self.raw.empty:
             return pd.DataFrame({})
 
-        date_range = pd.date_range(start=_self.start_time, end=_self.end_time, freq='D')
+        date_range = pd.date_range(start=self.start_time, end=self.end_time, freq='D')
         daily = pd.DataFrame(date_range, columns=[C.AS_DT])
         daily[C.TRADE_AMT] = 0.0
         daily[C.INST_DAYS] = 0.0
 
         # 遍历数据库查询结果
-        for row in _self.raw.index:
+        for row in self.raw.index:
             # 回购金额
-            trade_amt = _self.raw.loc[row][C.TRADE_AMT]
+            trade_amt = self.raw.loc[row, C.TRADE_AMT]
             # 满足统计区间的起始时间
-            as_date = _self.raw.loc[row][C.AS_DT]
-            # 满足统计区间的截至时间
-            ae_date = _self.raw.loc[row][C.AE_DT]
+            as_date = self.raw.loc[row, C.AS_DT]
+            # 满足统计区间的截止统计时间
+            ae_date = self.raw.loc[row, C.AE_DT]
             # 每天的利息
-            inst_a_day = _self.raw.loc[row][C.INST_A_DAY]
+            inst_a_day = self.raw.loc[row, C.INST_A_DAY]
 
-            # 将起止时间段的回购余额和利息总额进行汇总
+            # 将起止时间段的余额和利息总额进行汇总
             mask = (daily[C.AS_DT] >= as_date) & (daily[C.AS_DT] < ae_date)
             daily.loc[mask, [C.TRADE_AMT]] += trade_amt
             daily.loc[mask, [C.INST_DAYS]] += inst_a_day
 
-        daily[C.WEIGHT_RATE] = daily[C.INST_DAYS] * _self.inst_base / daily[C.TRADE_AMT] * 100
+        daily[C.WEIGHT_RATE] = daily[C.INST_DAYS] * self.inst_base / daily[C.TRADE_AMT] * 100
         daily[C.WEIGHT_RATE] = daily[C.WEIGHT_RATE].fillna(0)
 
-        # print(daily.columns)
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(daily)
 
         return daily
 
     # 交易对手排名
-    def party_rank(_self) -> pd.DataFrame:
+    # def party_rank(self) -> pd.DataFrame:
+    #     """
+    #     按照主机构的日均余额进行排名，返回统计数据.
+    #
+    #     Returns:
+    #         pd.DataFrame: [C.NAME, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
+    #     """
+    #
+    #     if self.raw.empty:
+    #         return pd.DataFrame({})
+    #
+    #     party = self._groupby_column(C.NAME)
+    #
+    #     # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    #     #     print(repo_rank)
+    #
+    #     return party
+
+    # def term_rank(self) -> pd.DataFrame:
+    #     """
+    #     按照各期限的日均余额进行排名，返回统计数据.
+    #
+    #     Returns:
+    #         pd.DataFrame: [C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
+    #     """
+    #
+    #     if self.raw.empty:
+    #         return pd.DataFrame({})
+    #
+    #     term = self._groupby_column(C.TERM_TYPE)
+    #
+    #     # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    #     #     print(term)
+    #
+    #     return term
+
+    # def head_stats(self) -> Dict:
+    #     """
+    #     统计交易数据，用于在repo.py的题头显示.
+    #
+    #     Returns:
+    #         Dict: {C.TRADE_NUM, C.TRADE_SUM, C.TRADE_WEIGHT_SUM, C.MAX_RATE, C.MIN_RATE}
+    #     """
+    #
+    #     if self.raw.empty:
+    #         return {}
+    #
+    #     mask = ((self.raw[C.SETTLEMENT_DATE] >= self.start_time.strftime('%Y-%m-%d')) &
+    #             (self.raw[C.SETTLEMENT_DATE] <= self.end_time.strftime('%Y-%m-%d')))
+    #     occ_stats = self.raw[mask]
+    #
+    #     return {
+    #         # 交易笔数
+    #         C.TRADE_NUM: occ_stats.shape[0],
+    #         # 交易总额（按发生）
+    #         C.TRADE_SUM: occ_stats[C.TRADE_AMT].sum(),
+    #         # 交易金额（按加权）
+    #         C.TRADE_WEIGHT_SUM: self.raw[C.TRADE_AMT].sum(),
+    #         # 单笔利率(最大）
+    #         C.MAX_RATE: occ_stats[C.RATE].max(),
+    #         # 单笔利率(最小）
+    #         C.MIN_RATE: occ_stats[C.RATE].min()
+    #     }
+
+    def groupby_column(self, column: str) -> pd.DataFrame:
         """
-        Rank counterparties based on the transaction data.
-
-        Returns:
-            pd.DataFrame: The counterparty rankings.
-        """
-
-        if _self.raw.empty:
-            return pd.DataFrame({})
-
-        repo_rank = _self.__groupby_column(C.NAME)
-
-        return repo_rank
-
-    def term_rank(_self) -> pd.DataFrame:
-        """
-        Rank terms based on the transaction data.
-
-        Returns:
-            pd.DataFrame: The term rankings.
-        """
-
-        if _self.raw.empty:
-            return pd.DataFrame({})
-
-        return _self.__groupby_column(C.TERM_TYPE)
-
-    def occ_stats(self) -> Dict:
-        """
-        Calculate statistics for the transaction.
-
-        Returns:
-            Dict: The calculated statistics.
-        """
-
-        if self.raw.empty:
-            return {}
-
-        mask = ((self.raw[C.SETTLEMENT_DATE] >= self.start_time.strftime('%Y-%m-%d')) &
-                (self.raw[C.SETTLEMENT_DATE] <= self.end_time.strftime('%Y-%m-%d')))
-        occ_stats = self.raw[mask]
-
-        return {
-            # 交易笔数
-            C.TRADE_NUM: occ_stats.shape[0],
-            # 交易总额（按发生）
-            C.TRADE_SUM: occ_stats[C.TRADE_AMT].sum(),
-            # 交易金额（按加权）
-            C.TRADE_WEIGHT_SUM: self.raw[C.TRADE_AMT].sum(),
-            # 单笔利率(最大）
-            C.MAX_RATE: occ_stats[C.RATE].max(),
-            # 单笔利率(最小）
-            C.MIN_RATE: occ_stats[C.RATE].min()
-        }
-
-    def __groupby_column(self, column: str) -> pd.DataFrame:
-        """
-        Group the transaction data by a specific column.
+        将原始数据按照特定列group聚合.
 
         Args:
-            column (str): The column to group by.
+            column (str): 被聚合的列.
 
         Returns:
-            pd.DataFrame: The grouped data.
+            pd.DataFrame: [column, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
         """
 
         # 按期限类型进行分组
@@ -217,43 +215,38 @@ class FundTx:
         # 计算日均余额
         avg_amt = product / ((self.end_time - self.start_time).days + 1)
         # 分组后按日均余额升序排列
-        term_type = pd.DataFrame({C.AVG_AMT: avg_amt,
-                                  C.INST_GROUP: inst_group,
-                                  C.PRODUCT: product,
-                                  C.WEIGHT_RATE: weight_rate})
-        term_type.sort_values(by=C.AVG_AMT, ascending=False, inplace=True)
-        term_type.reset_index(inplace=True)
-        return term_type
+        column_type = pd.DataFrame({C.AVG_AMT: avg_amt,
+                                    C.INST_GROUP: inst_group,
+                                    C.PRODUCT: product,
+                                    C.WEIGHT_RATE: weight_rate})
+        column_type.sort_values(by=C.AVG_AMT, ascending=False, inplace=True)
+        column_type.reset_index(inplace=True)
 
-    def get_stime(self):
-        return self.start_time
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(term_type)
 
-    def get_etime(self):
-        return self.end_time
-
-    def get_dierection(self):
-        return self.direction
+        return column_type
 
 
 class Repo(FundTx):
     """
-    This class represents a repo transaction.
+    回购交易类.
 
     Attributes:
-        start_time (datetime.date): The start time of the transaction.
-        end_time (datetime.date): The end time of the transaction.
-        direction (str): The direction of the transaction.
+        start_time (datetime.date): 交易的开始统计时间.
+        end_time (datetime.date): 交易截止统计时间（含）.
+        direction (str): 交易方向.
     """
 
     # TODO 还缺少买断式回购、交易所回购的统计，同时要补全机构的code
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
         """
-        Initialize a Repo instance.
+        构造函数.
 
         Args:
-            start_time (datetime.date): The start time of the transaction.
-            end_time (datetime.date): The end time of the transaction.
-            direction (str): The direction of the transaction.
+            start_time (datetime.date): 交易的开始统计时间.
+            end_time (datetime.date): 交易截止统计时间（含）.
+            direction (str): 交易方向.
         """
 
         super().__init__(start_time, end_time, direction)
@@ -290,13 +283,13 @@ class Repo(FundTx):
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
-        Retrieve raw data from the database.
+        从数据库获取原始数据.
 
         Args:
-            sql (str): The SQL query to execute.
+            sql (str): sql语句.
 
         Returns:
-            pd.DataFrame: The raw data retrieved from the database.
+            pd.DataFrame: 数据库获取的交易数据.
         """
 
         raw = super()._get_raw_data(sql)
@@ -315,12 +308,12 @@ class IBO(FundTx):
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
         """
-        This class represents an IBO transaction.
+        构造函数.
 
-        Attributes:
-            start_time (datetime.date): The start time of the transaction.
-            end_time (datetime.date): The end time of the transaction.
-            direction (str): The direction of the transaction.
+        Args:
+            start_time (datetime.date): 交易的开始统计时间.
+            end_time (datetime.date): 交易截止统计时间（含）.
+            direction (str): 交易方向.
         """
 
         super().__init__(start_time, end_time, direction)
@@ -358,13 +351,13 @@ class IBO(FundTx):
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
-        Retrieve raw data from the database.
+        从数据库获取原始数据.
 
         Args:
-            sql (str): The SQL query to execute.
+            sql (str): sql语句.
 
         Returns:
-            pd.DataFrame: The raw data retrieved from the database.
+            pd.DataFrame: 数据库获取的交易数据.
         """
 
         raw1 = super()._get_raw_data(sql)
@@ -399,4 +392,4 @@ if __name__ == '__main__':
     # repo = Repo(s_t, e_t, '正回购')
     # print(repo.daily_data(s_t, e_t, '正回购'))
     ibo = IBO(s_t, e_t, '同业拆入')
-    print(ibo.daily_data(s_t, e_t, '同业拆入'))
+    print(ibo.daily_data())

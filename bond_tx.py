@@ -4,134 +4,82 @@
 # Description: This module contains classes for handling security transactions, specifically for bonds and CDs.
 import datetime
 import pandas as pd
-from numpy import float64
 
 from utils.db_util import get_raw, create_conn
 from utils.db_util import Constants as C
 
 
-# The SecurityTx class represents a security transaction.
 class SecurityTx:
     """
-        A class used to represent a Security Transaction.
+        固定收益业务的基类.
 
         ...
 
         Attributes
         ----------
         start_time : datetime.date
-            The start date of the transaction
+            交易开始统计时间
         end_time : datetime.date
-            The end date of the transaction
+            交易截至统计时间（含）
         conn : sqlite3.Connection
-            The connection to the database
-        trades : pandas.DataFrame
-            The trades made during the transaction
-        holded_info : pandas.DataFrame
-            Information about the bonds held during the transaction
-        request : pandas.DataFrame
-            The request distributions of the transaction
-        insts_flow : pandas.DataFrame
-            The cash flow of the institutions involved in the transaction
+            数据库连接对象
+        secondary_trades : pandas.DataFrame
+            二级交易记录
+        primary_trades : pandas.DataFrame
+            一级交易记录
+        holded_bonds_info : pandas.DataFrame
+            持有期间的债券基础信息
+        insts_flow_all : pandas.DataFrame
+            持有期间的债券的利息现金流
         value : pandas.DataFrame
-            The daily value of all the bonds involved in the transaction
+            每日估值
         holded : pandas.DataFrame
-            The daily holded bonds of all the bonds involved in the transaction
+            每日持仓
         capital : pandas.DataFrame
-            The capital of all the bonds involved in the transaction
+            持有期间的资本利得
 
-        Methods
-        -------
-        _get_raw_data(sql: str) -> pd.DataFrame:
-            Retrieves raw data from the database using the provided SQL query.
-        get_holded_bonds_info() -> pd.DataFrame:
-            Returns information about the bonds held during the transaction.
-        get_holded_bonds() -> pd.DataFrame:
-            Returns the daily holded bonds of all the bonds involved in the transaction.
-        get_request_distributions() -> pd.DataFrame:
-            Returns the request distributions of the transaction.
-        get_all_trades() -> pd.DataFrame:
-            Returns the trades made during the transaction.
-        get_inst_cash_flow_all() -> pd.DataFrame:
-            Returns the cash flow of the institutions involved in the transaction.
-        get_daily_value_all() -> pd.DataFrame:
-            Returns the daily value of all the bonds involved in the transaction.
-        get_capital_all() -> pd.DataFrame:
-            Returns the capital of all the bonds involved in the transaction.
-        _inst_cash_flow_all() -> pd.DataFrame:
-            Retrieves the cash flow of all institutions involved in the transaction from the database.
-        get_inst_flow(bond_code: str) -> pd.DataFrame:
-            Returns the cash flow of a specific institution involved in the transaction.
-        _daily_value_all() -> pd.DataFrame:
-            Retrieves the daily value of all bonds involved in the transaction from the database.
-        get_daily_value(bond_code: str) -> pd.DataFrame:
-            Returns the daily value of a specific bond involved in the transaction.
-        _daily_holded_all() -> pd.DataFrame:
-            Retrieves the daily holded bonds of all bonds involved in the transaction from the database.
-        daily_holded_bond(_self, bond_code: str) -> pd.DataFrame:
-            Returns the daily holded bonds of a specific bond involved in the transaction.
-        _request_distributions() -> pd.DataFrame:
-            Retrieves the request distributions of the transaction from the database.
-        _bank_trades(_self) -> pd.DataFrame:
-            Retrieves the trades made by banks during the transaction from the database.
-        _exchange_trades(self) -> pd.DataFrame:
-            Retrieves the trades made on the exchange during the transaction from the database.
-        _sum_all_trades(self) -> pd.DataFrame:
-            Returns the sum of all trades made during the transaction.
-        _capital_all(self) -> pd.DataFrame:
-            Retrieves the capital of all bonds involved in the transaction from the database.
-        get_capital(self, bond_code: str) -> pd.DataFrame:
-            Returns the capital of a specific bond involved in the transaction.
-        get_daily_insts(_self, bond_code: str) -> pd.DataFrame:
-            Returns the daily institutions of a specific bond involved in the transaction.
-        get_net_profit(_self, bond_code: str) -> pd.DataFrame:
-            Returns the net profit of a specific bond involved in the transaction.
-        _holded_bonds_info(self) -> pd.DataFrame:
-            Retrieves information about the bonds held during the transaction from the database.
-        sum_all_profits(self, bond_code: str) -> pd.DataFrame:
-            Returns the sum of all profits made from a specific bond during the transaction.
     """
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         """
-                Constructs all the necessary attributes for the SecurityTx object.
+                构造函数.
 
                 Parameters
                 ----------
                     start_time : datetime.date
-                        The start date of the transaction
+                        交易统计的开始时间
                     end_time : datetime.date
-                        The end date of the transaction
+                        交易统计的截止时间（含）
         """
 
         self.start_time = start_time
         self.end_time = end_time
         self.conn = create_conn()
 
-        self.trades = self._sum_all_trades()
-        self.holded_info = self._holded_bonds_info()
+        self.secondary_trades = self._sum_secondary_trades()
+        self.holded_bonds_info = self._holded_bonds_info()
 
         bond_type = pd.DataFrame({})
-        if not self.holded_info.empty:
-            bond_type = self.holded_info[[C.BOND_CODE, C.BOND_TYPE_NUM]]
+        if not self.holded_bonds_info.empty:
+            bond_type = self.holded_bonds_info[[C.BOND_CODE, C.BOND_TYPE_NUM]]
 
-        self.request = self._request_distributions()
-        self.insts_flow = self._inst_cash_flow_all()
+        self.primary_trades = self._primary_trades()
+        self.insts_flow_all = self._inst_cash_flow_all()
         self.value = self._daily_value_all()
         self.holded = self._daily_holded_all()
         self.capital = self._capital_gains_all()
 
         if not bond_type.empty:
 
-            if not self.request.empty:
-                self.request = self.request.reset_index(drop=False)
-                self.request = pd.merge(self.request, bond_type, on=C.BOND_CODE, how='left')
+            if not self.primary_trades.empty:
+                self.primary_trades = self.primary_trades.reset_index(drop=False)
+                self.primary_trades = pd.merge(self.primary_trades, bond_type, on=C.BOND_CODE, how='left')
 
-            if not self.trades.empty:
-                self.trades = pd.merge(self.trades, bond_type, on=C.BOND_CODE, how='left')
+            if not self.secondary_trades.empty:
+                self.secondary_trades = pd.merge(self.secondary_trades, bond_type, on=C.BOND_CODE, how='left')
 
-            if not self.insts_flow.empty:
-                self.insts_flow = pd.merge(self.insts_flow, bond_type, on=C.BOND_CODE, how='left')
+            if not self.insts_flow_all.empty:
+                self.insts_flow_all = pd.merge(self.insts_flow_all, bond_type, on=C.BOND_CODE, how='left')
 
             if not self.value.empty:
                 self.value = pd.merge(self.value, bond_type, on=C.BOND_CODE, how='left')
@@ -143,6 +91,17 @@ class SecurityTx:
                 self.capital = pd.merge(self.capital, bond_type, on=C.BOND_CODE, how='left')
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
+
+        """
+        从数据库获取原始数据.
+
+        Args:
+            sql (str): sql语句.
+
+        Returns:
+            pd.DataFrame: 数据库获取的交易数据.
+        """
+
         if self.start_time > self.end_time:
             return pd.DataFrame({})
 
@@ -154,21 +113,12 @@ class SecurityTx:
     def _holded_bonds_info(self) -> pd.DataFrame:
 
         """
-        Retrieves information about the bonds held during the transaction from the database.
+        交易期间持有的债券信息，不包括早期的收益凭证。
+        Returns:
+            pd.DataFrame: [C.BOND_NAME, C.BOND_FULL_NAME, C.BOND_CODE, C.BOND_TYPE_NUM, C.BOND_TYPE, C.ISSUE_DATE},
+            C.MATURITY, C.COUPON_RATE_CURRENT, C.COUPON_RATE_ISSUE, C.ISSUE_AMT, C.ISSUE_PRICE, C.ISSUE_ORG,
+            C.BOND_TERM, C.MARKET_CODE]
 
-        This method constructs a SQL query to fetch the held bonds data from the database.
-        The query selects distinct bond name, bond full name, bond code, bond type number, bond type,
-        issue date, maturity, current coupon rate, issue coupon rate, issue amount, issue price, issue organization,
-        bond term, and market code from the core_carrybondholds and basic_bondbasicinfos tables in the database.
-        The query filters the data based on the carry date and carry type.
-
-        Returns
-        -------
-        pd.DataFrame
-            A DataFrame containing information about the bonds held during the transaction.
-            If the start time is later than the end time, an empty DataFrame is returned.
-            If the current coupon rate is not available, the issue coupon rate is used.
-            If the market code is not available, the bond is excluded from the DataFrame.
         """
 
         if self.start_time > self.end_time:
@@ -209,56 +159,53 @@ class SecurityTx:
 
         # 由于早期购买的券商收益凭证不全，过滤掉不纳入统计
         mask = pd.isna(raw.loc[:, C.MARKET_CODE])
+
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw.loc[~mask, :])
+
         return raw.loc[~mask, :]
 
-    def get_holded_bonds_info(self) -> pd.DataFrame:
-        return self.holded_info
+    # def get_holded_bonds_info(self) -> pd.DataFrame:
+    #     return self.holded_bonds_info
 
-    def get_holded_bonds(self) -> pd.DataFrame:
-        return self.holded
+    # def get_holded_bonds(self) -> pd.DataFrame:
+    #     return self.holded
 
-    def get_holding_bonds_endtime(self) -> pd.DataFrame:
-        return self.holded[self.holded[C.DATE].dt.date == self.end_time]
+    #
+    # def get_holding_bonds_endtime(self) -> pd.DataFrame:
+    #     return self.holded[self.holded[C.DATE].dt.date == self.end_time]
 
-    def get_primary_trades(self) -> pd.DataFrame:
-        return self.request
+    # def get_primary_trades(self) -> pd.DataFrame:
+    #     return self.primary_trades
 
-    def get_secondary_trades(self) -> pd.DataFrame:
-        return self.trades
+    # def get_secondary_trades(self) -> pd.DataFrame:
+    #     return self.secondary_trades
 
-    def get_inst_cash_flow_all(self) -> pd.DataFrame:
-        return self.insts_flow
+    # def get_inst_cash_flow_all(self) -> pd.DataFrame:
+    #     return self.insts_flow_all
 
-    def get_daily_value_all(self) -> pd.DataFrame:
-        return self.value
+    # def get_daily_value_all(self) -> pd.DataFrame:
+    #     return self.value
 
-    def get_capital_all(self) -> pd.DataFrame:
-        return self.capital
+    # def get_capital_all(self) -> pd.DataFrame:
+    #     return self.capital
 
     # 1.1 全量利息现金流获取
     def _inst_cash_flow_all(self) -> pd.DataFrame:
 
         """
-        Retrieves the cash flow of all institutions involved in the transaction from the database.
+        统计区间内持仓债券的利息现金流
 
-        This method constructs a SQL query to fetch the cash flow data from the database.
-        The query selects the bond code, bond name, start date, end date, accrual days, and period inst
-        from the basic_bondcashflows table in the database.
-        The query filters the data based on the bond code and the date range.
+        Returns:
+            pd.DataFrame: [C.BOND_CODE, C.BOND_NAME, C.INST_START_DATE, C.INST_END_DATE, C.ACCRUAL_DAYS, C.PERIOD_INST]
 
-        Returns
-        -------
-        pd.DataFrame
-            A DataFrame containing the cash flow of all institutions involved in the transaction.
-            If the start time is later than the end time or if there is no held bond information,
-            an empty DataFrame is returned.
         """
 
-        if self.start_time > self.end_time or self.holded_info.empty:
+        if self.start_time > self.end_time or self.holded_bonds_info.empty:
             return pd.DataFrame({})
 
         # 只取区间内持仓的债券利息现金流
-        bonds_code_str = ', '.join([f"'{item}'" for item in (self.holded_info[C.BOND_CODE]).tolist()])
+        bonds_code_str = ', '.join([f"'{item}'" for item in (self.holded_bonds_info[C.BOND_CODE]).tolist()])
 
         sql = f"select " \
               f"bb.{C.BOND_CODE}, " \
@@ -283,35 +230,28 @@ class SecurityTx:
     def get_inst_flow(self, bond_code: str) -> pd.DataFrame:
 
         """
-            Retrieves the cash flow of a specific institution involved in the transaction.
+        某支债券的利息现金流
 
-            This method filters the cash flow data based on the provided bond code. It then constructs a DataFrame that
-            represents the daily cash flow of the institution. The method fills in missing dates in the cash flow data
-            and calculates the daily cash flow based on the period inst and accrual days.
+        Parameters
+        ----------
+        bond_code : str
+            债券代码
 
-            Parameters
-            ----------
-            bond_code : str
-                The bond code of the institution whose cash flow is to be retrieved.
+        Returns:
+            pd.DataFrame: [C.DATE, C.INST_A_DAY]
 
-            Returns
-            -------
-            pd.DataFrame
-                A DataFrame containing the daily cash flow of the institution. If the bond code is not found in the
-                cash flow data or if the cash flow data is empty, an empty DataFrame is returned.
         """
 
-        if self.insts_flow.empty or (bond_code not in self.insts_flow[C.BOND_CODE].tolist()):
+        if self.insts_flow_all.empty or (bond_code not in self.insts_flow_all[C.BOND_CODE].tolist()):
             return pd.DataFrame({})
 
-        # Filter the cash flow data based on the bond code
-        bond = self.insts_flow.loc[self.insts_flow[C.BOND_CODE] == bond_code]
+        bond = self.insts_flow_all.loc[self.insts_flow_all[C.BOND_CODE] == bond_code]
 
-        # Initialize a DataFrame to store the daily cash flow of the institution
+        # 初始化
         inst_daily = pd.DataFrame(columns=[C.DATE, C.INST_A_DAY])
 
         # 取持仓时间段
-        inst_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE].copy()
+        inst_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code, C.DATE]
         # 补充下缺失的日期
         inst_daily = inst_daily.set_index(C.DATE).resample('D').asfreq().reset_index()
         inst_daily[C.INST_A_DAY] = 0.0
@@ -326,37 +266,25 @@ class SecurityTx:
             # 由于计息天数等因素的差异，根据利息现金流分时间段赋值
             inst_daily.loc[inst_daily[C.DATE].isin(date_range), C.INST_A_DAY] = inst_a_day
 
-        # 将inst_daily[C.INST_A_DAY]中的缺失值填充为0
-        # inst_daily[C.INST_A_DAY] = inst_daily[C.INST_A_DAY].fillna(0.0).astype(float64)
-        # 查看inst_daily[C.INST_A_DAY]存储的值类型
-        # print(inst_daily[C.INST_A_DAY].dtype)
         return inst_daily
 
     # 2.1 全量估值获取
     def _daily_value_all(self) -> pd.DataFrame:
 
         """
-        Retrieves the daily value of all bonds involved in the transaction from the database.
-
-        This method constructs a SQL query to fetch the daily value data from the database.
-        The query selects the deal date, bond code, bond name, value type, and net price
-        from the basic_bondvaluations table in the database.
-        The query filters the data based on the bond code and the date range.
-        The date range is extended by 60 days on both ends to account for non-working days.
+        查询全量每日估值，日期范围在两端各延长 60 天
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the daily value of all bonds involved in the transaction.
-            If the start time is later than the end time or if there is no held bond information,
-            an empty DataFrame is returned.
+              [C.DEAL_DATE, C.DATE, C.BOND_CODE, C.BOND_NAME, C.VALUE_TYPE, C.VALUE_NET_PRICE]
         """
 
-        if self.start_time > self.end_time or self.holded_info.empty:
+        if self.start_time > self.end_time or self.holded_bonds_info.empty:
             return pd.DataFrame({})
 
         # 由于数据库表对于非工作日没有估值，所以查询的时间区间前后各增加60个工作日，避免数据缺失
-        bonds_code_str = ', '.join([f"'{item}'" for item in (self.holded_info[C.BOND_CODE]).tolist()])
+        bonds_code_str = ', '.join([f"'{item}'" for item in (self.holded_bonds_info[C.BOND_CODE]).tolist()])
         sql = f"select " \
               f"bv.{C.DEAL_DATE} as {C.DATE}, " \
               f"bv.{C.BOND_CODE}, " \
@@ -379,30 +307,25 @@ class SecurityTx:
     def get_daily_value(self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the daily value of a specific bond involved in the transaction.
-
-        This method filters the daily value data based on the provided bond code. It then constructs a DataFrame that
-        represents the daily value of the bond. The method fills in missing dates in the value data and assigns a
-        default value of 100 to dates for which the value data is not available in the database.
+        获取单支债券的每日估值
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose daily value is to be retrieved.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the daily value of the bond. If the bond code is not found in the
-            value data or if the value data is empty, a DataFrame with a default value of 100 is returned.
+            [C.DATE, C.VALUE_NET_PRICE]
         """
 
-        if (self.start_time > self.end_time or self.holded_info.empty or
-                (bond_code not in self.holded_info[C.BOND_CODE].tolist())):
+        if (self.start_time > self.end_time or self.holded_bonds_info.empty or
+                (bond_code not in self.holded_bonds_info[C.BOND_CODE].tolist())):
             return pd.DataFrame({})
 
         value_daily = pd.DataFrame(columns=[C.DATE])
-        value_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code][C.DATE]
+        value_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code, C.DATE]
 
         # 如果数据库中没有估值，则默认为100
         if self.value.empty or (bond_code not in self.value[C.BOND_CODE].tolist()):
@@ -413,6 +336,7 @@ class SecurityTx:
         bond = bond.drop_duplicates(C.DATE)
 
         # 非工作日数据缺失，取前一个工作日的估值
+        # todo 如果中间有缺失，估值100会造成收益率曲线波动，取最后一个非空值是否更好
         bond = bond.set_index(C.DATE).resample('D').asfreq().reset_index()
         bond.ffill(inplace=True)
 
@@ -426,23 +350,15 @@ class SecurityTx:
     def _daily_holded_all(self) -> pd.DataFrame:
 
         """
-        Retrieves the daily held bonds of all bonds involved in the transaction from the database.
-
-        This method constructs a SQL query to fetch the daily held bonds data from the database.
-        The query selects the carry date, bond name, bond code, market code, hold amount,
-        cost full price, and cost net price from the core_carrybondholds table in the database.
-        The query filters the data based on the carry date and excludes certain portfolio numbers.
-        The date range is extended by 10 days on both ends to account for non-working days.
+        查询每日持仓数据，日期范围在两端各延长 60 天，不含委托投资
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the daily held bonds of all bonds involved in the transaction.
-            If the start time is later than the end time or if there is no held bond information,
-            an empty DataFrame is returned.
+              [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE]
         """
 
-        if self.start_time > self.end_time or self.holded_info.empty:
+        if self.start_time > self.end_time or self.holded_bonds_info.empty:
             return pd.DataFrame({})
 
         # 注意：由于基础信息不全，这里排除了“委托投资”的持仓
@@ -470,46 +386,36 @@ class SecurityTx:
     def daily_holded_bond(_self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the daily held bonds of a specific bond involved in the transaction.
-
-        This method filters the daily held bonds data based on the provided bond code.
+        按债券代码返回每日持仓
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose daily held bonds are to be retrieved.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the daily held bonds of the bond. If the bond code is not found in the
-            held bonds data or if the held bonds data is empty, an empty DataFrame is returned.
+            [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE]
         """
 
-        if (_self.start_time > _self.end_time or _self.holded_info.empty or
-                (bond_code not in _self.holded_info[C.BOND_CODE].tolist())):
+        if (_self.start_time > _self.end_time or _self.holded_bonds_info.empty or
+                (bond_code not in _self.holded_bonds_info[C.BOND_CODE].tolist())):
             return pd.DataFrame({})
 
         bond = _self.holded.loc[_self.holded[C.BOND_CODE] == bond_code]
 
         return bond
 
-    def _request_distributions(self) -> pd.DataFrame:
+    def _primary_trades(self) -> pd.DataFrame:
 
         """
-        Retrieves the request distributions of the transaction from the database.
-
-        This method constructs a SQL query to fetch the request distributions data from the database.
-        The query selects the trade date, bond name, bond code, market code, direction, net price, and bond amount in
-        cash from the ext_requestdistributions table in the database.
-        The query filters the data based on the trade date and checks the status of the request.
+        查询一级交易数据（全市场）
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the request distributions of the transaction grouped by date, bond code, market code,
-            direction, and bond name. The DataFrame aggregates the net price and bond amount in cash.
-            If the start time is later than the end time, an empty DataFrame is returned.
+              [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.DIRECTION, C.NET_PRICE, C.BOND_AMT_CASH]
         """
 
         if self.start_time > self.end_time:
@@ -546,19 +452,13 @@ class SecurityTx:
     def _bank_trades(_self) -> pd.DataFrame:
 
         """
-        Retrieves the transactions in the interbank market during the transaction from the database.
-
-        This method constructs a SQL query to fetch the bank trades data from the database.
-        The query selects the settlement date, bond name, bond code, market code, direction, net price, full price,
-        bond amount in cash, accrued inst cash, trade amount, and settle amount
-        from the trade_cashbonds table in the database.
-        The query filters the data based on the trade time and checks the status of the trade.
+        查询银行间市场的二级交易数据
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the trades made by banks during the transaction.
-            If the start time is later than the end time, an empty DataFrame is returned.
+              [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.DIRECTION, C.NET_PRICE, C.FULL_PRICE, C.BOND_AMT_CASH,
+              C.ACCRUED_INST_CASH, C.TRADE_AMT, C.SETTLE_AMT]
         """
 
         if _self.start_time > _self.end_time:
@@ -589,19 +489,13 @@ class SecurityTx:
     def _exchange_trades(self) -> pd.DataFrame:
 
         """
-        Retrieves the transactions on the exchange during the transaction from the database.
-
-        This method constructs a SQL query to fetch the exchange trades data from the database.
-        The query selects the trade date, bond name, bond code, market code, direction, net price, full price,
-        bond amount in cash, trade amount, accrued inst cash, and settle amount
-        from the trade_exchgcashbonds table in the database.
-        The query filters the data based on the trade date and checks the status of the trade.
+        查询交易所市场的二级交易数据
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the trades made on the exchange during the transaction.
-            If the start time is later than the end time, an empty DataFrame is returned.
+              [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.DIRECTION, C.NET_PRICE, C.FULL_PRICE, C.BOND_AMT_CASH,
+              C.ACCRUED_INST_CASH, C.TRADE_AMT, C.SETTLE_AMT]
         """
 
         if self.start_time > self.end_time:
@@ -629,19 +523,15 @@ class SecurityTx:
 
         return self._get_raw_data(sql)
 
-    def _sum_all_trades(self) -> pd.DataFrame:
+    def _sum_secondary_trades(self) -> pd.DataFrame:
         """
-        Retrieves all trades made during the transaction from both the interbank market and the exchange.
-
-        This method calls the _bank_trades and _exchange_trades methods to fetch the trades data from the database.
-        The data from both sources is then concatenated into a single DataFrame.
+        汇总银行间和交易所市场的二级交易市场数据
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing all trades made during the transaction.
-            If the start time is later than the end time, an empty DataFrame is returned.
-            If there are no trades on the exchange, only the bank trades are returned.
+              [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.DIRECTION, C.NET_PRICE, C.FULL_PRICE, C.BOND_AMT_CASH,
+              C.ACCRUED_INST_CASH, C.TRADE_AMT, C.SETTLE_AMT]
         """
 
         if self.start_time > self.end_time:
@@ -664,27 +554,21 @@ class SecurityTx:
     # 3.1 全量资本利得获取
     def _capital_gains_all(self) -> pd.DataFrame:
         """
-        Retrieves the capital of all bonds involved in the transaction from the database.
-
-        This method constructs a DataFrame that represents the capital of all bonds involved in the transaction.
-        The DataFrame is constructed by grouping the trades data based on the date, bond code, and bond name.
-        The method calculates the weighted net price for each group and merges the result with the held bonds data.
-        The method then calculates the capital gains for each group.
+        统计区间内的所有资本利得
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the capital of all bonds involved in the transaction.
-            If the start time is later than the end time or if there are no trades, an empty DataFrame is returned.
-            If there are no trades for a specific bond, the capital gains for that bond are set to 0.
+                [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT, C.MARKET_CODE, C.WEIGHT_NET_PRICE,
+                C.COST_NET_PRICE, C.CAPITAL_GAINS]
         """
 
-        if self.start_time > self.end_time or self.trades.empty:
+        if self.start_time > self.end_time or self.secondary_trades.empty:
             return pd.DataFrame({})
 
         # 只有卖出债券才有资本利得
-        mask = (self.trades[C.DIRECTION] == 4)
-        raw = self.trades.loc[mask, [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT]]
+        mask = (self.secondary_trades[C.DIRECTION] == 4)
+        raw = self.secondary_trades.loc[mask, [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT]]
 
         if raw.empty:
             return pd.DataFrame({})
@@ -700,7 +584,7 @@ class SecurityTx:
         # Create a copy of self.holded to avoid modifying the original DataFrame
         holded_copy = self.holded.copy()
 
-        # 3.2 从C.DATE列加一天，获取前一天的净成本价
+        # 3.2 从C.DATE列加一天，获取前一天的成本净价
         # add one day from the C.DATE column，get previous day's net cost price
         holded_copy[C.DATE] = holded_copy[C.DATE] + pd.Timedelta(days=1)
 
@@ -714,31 +598,27 @@ class SecurityTx:
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)
 
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw_group)
+
         return raw_group
 
     # 4.1 计算单只债券的利息
     def get_daily_insts(_self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the daily institutions of a specific bond involved in the transaction.
-
-        This method first retrieves the daily held bonds of the bond using the provided bond code.
-        If there are no daily held bonds, an empty DataFrame is returned.
-        The method then retrieves the cash flow of the institution involved in the transaction.
-        The daily institutions are calculated by merging the daily held bonds and the cash flow data.
-        The daily institutions are calculated as the product of the daily cash flow and the daily held bonds.
+        单支债券的每日利息
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose daily institutions are to be retrieved.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the daily institutions of the bond.
-            If there are no daily held bonds or if the bond code is not found in the daily held bonds data,
-            an empty DataFrame is returned.
+            [C.DATE, C.BOND_NAME, C.BOND_KEY, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, COST_NET_PRICE,
+            C.BOND_TYPE, C.INST_A_DAY]
         """
 
         raw = _self.daily_holded_bond(bond_code)
@@ -747,9 +627,6 @@ class SecurityTx:
             return pd.DataFrame({})
 
         inst = _self.get_inst_flow(bond_code)
-        # if inst.empty:
-        #     print(bond_code)
-        #     print(raw)
 
         # 按照数据库设计的逻辑，当到期日的第二天为非工作日时，无利息流，但是仍然有持仓和资金占用
         if inst.empty:
@@ -761,27 +638,27 @@ class SecurityTx:
         raw_inst[C.INST_A_DAY] = (raw_inst[C.INST_A_DAY] * raw_inst[C.HOLD_AMT] / 100)
         raw_inst.fillna(0, inplace=True)
 
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw_inst)
+
         return raw_inst
 
     # 4.2 计算单只债券的资本利得
     def get_capital_gains(self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the capital gains of a specific bond involved in the transaction.
-
-        This method filters the capital data based on the provided bond code.
+        单支债券的资本利得
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose capital is to be retrieved.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the capital of the bond. If the start time is later than the end time,
-            if the capital data is empty, or if the bond code is not found in the capital data,
-            an empty DataFrame is returned.
+            [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT, C.MARKET_CODE, C.WEIGHT_NET_PRICE,
+            C.COST_NET_PRICE, C.CAPITAL_GAINS]
         """
 
         if self.start_time > self.end_time or self.capital.empty or bond_code not in self.capital[C.BOND_CODE].tolist():
@@ -796,26 +673,18 @@ class SecurityTx:
     def get_net_profit(_self, bond_code: str) -> pd.DataFrame:
 
         """
-        Retrieves the net profit of a specific bond involved in the transaction.
-
-        This method first retrieves the daily held bonds of the bond using the provided bond code.
-        If there are no daily held bonds, an empty DataFrame is returned.
-        The method then retrieves the daily value of the bond.
-        The net profit is calculated by merging the daily held bonds and the daily value data.
-        The net profit is calculated as the product of the daily held bonds and the difference between
-        the daily value and the cost net price.
+        单支债券的净价浮盈
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose net profit is to be retrieved.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the net profit of the bond.
-            If there are no daily held bonds or if the bond code is not found in the daily held bonds data,
-            an empty DataFrame is returned.
+            [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE,
+            C.VALUE_NET_PRICE, C.NET_PROFIT]
         """
         raw = _self.daily_holded_bond(bond_code)
 
@@ -828,34 +697,30 @@ class SecurityTx:
         raw_value[C.NET_PROFIT] = (raw_value[C.HOLD_AMT] / 100 *
                                    (raw_value[C.VALUE_NET_PRICE] - raw_value[C.COST_NET_PRICE])).fillna(0)
 
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw_value)
+
         return raw_value
 
     # 4.4 计算单只债券的总收益
     def sum_profits(self, bond_code: str) -> pd.DataFrame:
         """
-        Calculates the total profits for a specific bond involved in the transaction.
-
-        This method first checks if the bond is held during the transaction period.
-        If not, an empty DataFrame is returned.
-        The method then retrieves the daily institutions and net profit of the bond.
-        It also retrieves the daily held bonds and capital of the bond.
-        The method then calculates the capital gains, merges the data, and fills in missing values.
-        Finally, it calculates the total profits and capital occupation.
+        汇总利息收入、资本利得和净价浮盈，计算总收益
 
         Parameters
         ----------
         bond_code : str
-            The bond code of the bond whose total profits are to be calculated.
+            债券代码
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame containing the total profits of the bond.
-            If the bond is not held during the transaction period, an empty DataFrame is returned.
+            [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE,
+            C.BOND_TYPE, C.CAPITAL_GAINS, C.INST_A_DAY,C.VALUE_NET_PRICE, C.NET_PROFIT, C.TOTAL_PROFIT,C.CAPITAL_OCCUPY]
         """
 
-        if (self.start_time > self.end_time or self.holded_info.empty or
-                bond_code not in self.holded_info[C.BOND_CODE].tolist()):
+        if (self.start_time > self.end_time or self.holded_bonds_info.empty or
+                bond_code not in self.holded_bonds_info[C.BOND_CODE].tolist()):
             return pd.DataFrame({})
 
         # 如果有该债券的持仓，这两项一定不会是空值
@@ -863,6 +728,7 @@ class SecurityTx:
         net_profit = self.get_net_profit(bond_code)
 
         bond = self.daily_holded_bond(bond_code).copy()
+
         capital = self.get_capital_gains(bond_code)
 
         # merge capital gains first
@@ -874,7 +740,6 @@ class SecurityTx:
                             on=[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME], how='outer')
             bond[C.CAPITAL_GAINS] = bond[C.CAPITAL_GAINS].fillna(0)
 
-        # merge daily institutions and net profit
         bond = pd.merge(bond, daily_insts[[C.DATE, C.INST_A_DAY]], on=C.DATE, how='left')
         bond = pd.merge(bond, net_profit[[C.DATE, C.VALUE_NET_PRICE, C.NET_PROFIT]], on=C.DATE, how='left')
         bond[C.MARKET_CODE] = bond[C.MARKET_CODE].ffill()
@@ -890,11 +755,25 @@ class SecurityTx:
         bond[C.CAPITAL_OCCUPY] = bond[C.HOLD_AMT] * bond[C.COST_FULL_PRICE] / 100
 
         mask = (bond[C.DATE] >= pd.to_datetime(self.start_time)) & (bond[C.DATE] <= pd.to_datetime(self.end_time))
+
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(bond)
+
         return bond.loc[mask, :]
 
     def get_all_profit_data(self):
+        """
+        汇总所有债券的总收益
+        :return:
+            [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE,
+            C.BOND_TYPE, C.CAPITAL_GAINS, C.INST_A_DAY,C.VALUE_NET_PRICE, C.NET_PROFIT, C.TOTAL_PROFIT,C.CAPITAL_OCCUPY
+            C.ISSUE_ORG]
+        """
 
-        bonds_info = self.get_holded_bonds_info()
+        # bonds_info = self.get_holded_bonds_info()
+        bonds_info = self.holded_bonds_info
+
+        # print(bonds_info)
 
         if bonds_info.empty:
             return pd.DataFrame({})
@@ -910,23 +789,21 @@ class SecurityTx:
 
         return bond_all
 
-    def get_stime(self) -> datetime.date:
-        return self.start_time
-
-    def get_etime(self) -> datetime.date:
-        return self.end_time
-
 
 class CDTx(SecurityTx):
+    """
+    存单交易类
+    """
+
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         super().__init__(start_time, end_time)
 
-        if not self.request.empty:
-            self.request = self.request.loc[self.request[C.BOND_TYPE_NUM] == 26, :]
-        if not self.trades.empty:
-            self.trades = self.trades.loc[self.trades[C.BOND_TYPE_NUM] == 26, :]
-        if not self.insts_flow.empty:
-            self.insts_flow = self.insts_flow.loc[self.insts_flow[C.BOND_TYPE_NUM] == 26, :]
+        if not self.primary_trades.empty:
+            self.primary_trades = self.primary_trades.loc[self.primary_trades[C.BOND_TYPE_NUM] == 26, :]
+        if not self.secondary_trades.empty:
+            self.secondary_trades = self.secondary_trades.loc[self.secondary_trades[C.BOND_TYPE_NUM] == 26, :]
+        if not self.insts_flow_all.empty:
+            self.insts_flow_all = self.insts_flow_all.loc[self.insts_flow_all[C.BOND_TYPE_NUM] == 26, :]
         if not self.value.empty:
             self.value = self.value.loc[self.value[C.BOND_TYPE_NUM] == 26, :]
         if not self.holded.empty:
@@ -934,25 +811,32 @@ class CDTx(SecurityTx):
         if not self.capital.empty:
             self.capital = self.capital.loc[self.capital[C.BOND_TYPE_NUM] == 26, :]
 
-        if not self.holded_info.empty:
-            self.holded_info = self.holded_info.loc[self.holded_info[C.BOND_TYPE_NUM] == 26, :]
+        if not self.holded_bonds_info.empty:
+            self.holded_bonds_info = self.holded_bonds_info.loc[self.holded_bonds_info[C.BOND_TYPE_NUM] == 26, :]
 
 
 class BondTx(SecurityTx):
+    """
+    债券交易类
+    """
+
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         super().__init__(start_time, end_time)
 
-        if not self.request.empty:
-            self.request = self.request.loc[self.request[C.BOND_TYPE_NUM] != 26, :]
-        if not self.trades.empty:
-            self.trades = self.trades.loc[self.trades[C.BOND_TYPE_NUM] != 26, :]
-        if not self.insts_flow.empty:
-            self.insts_flow = self.insts_flow.loc[self.insts_flow[C.BOND_TYPE_NUM] != 26, :]
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(self.holded_bonds_info[[C.BOND_TYPE_NUM, C.BOND_NAME]])
+
+        if not self.primary_trades.empty:
+            self.primary_trades = self.primary_trades.loc[self.primary_trades[C.BOND_TYPE_NUM] != 26, :]
+        if not self.secondary_trades.empty:
+            self.secondary_trades = self.secondary_trades.loc[self.secondary_trades[C.BOND_TYPE_NUM] != 26, :]
+        if not self.insts_flow_all.empty:
+            self.insts_flow_all = self.insts_flow_all.loc[self.insts_flow_all[C.BOND_TYPE_NUM] != 26, :]
         if not self.value.empty:
             self.value = self.value.loc[self.value[C.BOND_TYPE_NUM] != 26, :]
         if not self.holded.empty:
             self.holded = self.holded.loc[self.holded[C.BOND_TYPE_NUM] != 26, :]
         if not self.capital.empty:
             self.capital = self.capital.loc[self.capital[C.BOND_TYPE_NUM] != 26, :]
-        if not self.holded_info.empty:
-            self.holded_info = self.holded_info.loc[self.holded_info[C.BOND_TYPE_NUM] != 26, :]
+        if not self.holded_bonds_info.empty:
+            self.holded_bonds_info = self.holded_bonds_info.loc[self.holded_bonds_info[C.BOND_TYPE_NUM] != 26, :]

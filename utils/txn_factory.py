@@ -9,35 +9,35 @@ from typing import Type
 from fund_tx import FundTx, Repo, IBO
 
 
-class TxFactory:
+class FundTxFactory:
     """
-    A factory class for creating transaction objects.
+    资金交易的工厂类.
 
     Args:
-        txn_factory: The type of transaction to create.
+        txn_factory: 创建对象类型.
     """
 
     def __init__(self, txn_factory: Type[FundTx]) -> None:
         """
-        Initialize a TxFactory instance.
+        构造函数
 
         Args:
-            txn_factory (Type[FundTx]): The type of transaction to create.
+            txn_factory (Type[FundTx]): 被创建对象类型.
         """
 
         self.tx_factory = txn_factory
 
     def create_txn(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> FundTx:
         """
-        Create a transaction object.
+        创建一个具体的资金交易类.
 
         Args:
-            start_time (datetime.date): The start time of the transaction.
-            end_time (datetime.date): The end time of the transaction.
-            direction (str): The direction of the transaction.
+            start_time (datetime.date): 统计开始时间
+            end_time (datetime.date): 统计结束时间
+            direction (str): 交易方向
 
         Returns:
-            FundTx: A transaction object.
+            FundTx: 资金交易类.
         """
 
         txn = self.tx_factory(start_time, end_time, direction)
@@ -47,5 +47,5 @@ class TxFactory:
 if __name__ == "__main__":
     s_t = datetime.date(2023, 1, 1)
     e_t = datetime.date(2023, 12, 31)
-    repo = TxFactory(Repo).create_txn(s_t, e_t, "正回购")
-    ibo = TxFactory(IBO).create_txn(s_t, e_t, "拆借")
+    repo = FundTxFactory(Repo).create_txn(s_t, e_t, "正回购")
+    ibo = FundTxFactory(IBO).create_txn(s_t, e_t, "拆借")

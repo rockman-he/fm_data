@@ -47,7 +47,7 @@ with st.form("test"):
 if txn_submit:
     txn = SecurityTx(start_time, end_time)
 
-bond_code = '112321031.IB'
+bond_code = '112303195.IB'
 
 if txn is not None:
     st.write('## 债券业务')
@@ -55,10 +55,10 @@ if txn is not None:
 
     st.write('### 债券持仓记录')
     st.write('#### 所有债券的基础信息, get_holded_bonds_info()，不包括收益凭证')
-    st.dataframe(txn.get_holded_bonds_info())
+    st.dataframe(txn.holded_bonds_info)
 
     st.write('#### 持仓区间明细, get_holded_bonds')
-    st.dataframe(txn.get_holded_bonds())
+    st.dataframe(txn.holded)
     # #
     st.write('#### ' + bond_code + '的每日持仓, daily_holded_bond(bond_code)')
     st.dataframe(txn.daily_holded_bond(bond_code))
@@ -66,7 +66,7 @@ if txn is not None:
 
     st.write('### 利息计算')
     st.write('#### 区间内持仓债券利息现金流, get_inst_flow_all()')
-    st.dataframe(txn.get_inst_cash_flow_all())
+    st.dataframe(txn.insts_flow_all)
     #
     st.write('#### ' + bond_code + '的利息现金流, inst_cash_flow(bond_code)')
     st.dataframe(txn.get_inst_flow(bond_code))
@@ -77,7 +77,7 @@ if txn is not None:
 
     st.write('### 净价浮盈')
     st.write('#### 区间内持仓债券估值get_daily_value_all()，若无估值，则在daily_value(bond_code)置为100')
-    st.dataframe(txn.get_daily_value_all())
+    st.dataframe(txn.value)
 
     st.write('#### ' + bond_code + '的估值, get_daily_value(bond_code)')
     st.dataframe(txn.get_daily_value(bond_code))
@@ -90,13 +90,13 @@ if txn is not None:
     st.write('### 资本利得')
     st.write('#### 交易记录')
     st.write('#### 一级申购，request_distributions()')
-    st.dataframe(txn.get_primary_trades())
+    st.dataframe(txn.primary_trades)
 
     st.write('#### 二级交易, get_all_trades()')
-    st.dataframe(txn.get_secondary_trades())
+    st.dataframe(txn.secondary_trades)
 
     st.write('#### 资本利得, get_capital_all()')
-    st.dataframe(txn.get_capital_all(), use_container_width=True)
+    st.dataframe(txn.capital, use_container_width=True)
     st.divider()
 
     st.write('### 综合收益汇总')

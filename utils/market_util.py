@@ -10,19 +10,18 @@ from utils.db_util import Constants as C, create_conn, get_raw
 
 class MarketUtil:
     """
-    A utility class for handling market-related operations.
+    一个用于处理市场数据的工具类。
+
 
     Attributes:
-        start_time (datetime.date): The start time for retrieving the Interbank Rate Table (IRT).
-        end_time (datetime.date): The end time for retrieving the IRT.
-        raw (pd.DataFrame): The raw data retrieved from the database.
+        start_time (datetime.date): 统计开始时间。
+        end_time (datetime.date): 统计结束时间。
+        raw (pd.DataFrame): 从数据库中检索的原始数据。
     """
 
     def __init__(self):
         """
-        Initialize a MarketUtil instance.
-
-        The start time, end time, and raw data are initialized as None or an empty DataFrame respectively.
+        构造函数
         """
 
         self.start_time = None
@@ -32,14 +31,14 @@ class MarketUtil:
     def get_irt(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
 
         """
-        Retrieve the Interbank Rate Table (IRT) for a given time period.
+        获取资金市场各品种利率.
 
         Args:
-            start_time (datetime.date): The start time for retrieving the IRT.
-            end_time (datetime.date): The end time for retrieving the IRT.
+            start_time (datetime.date): 统计开始时间。
+            end_time (datetime.date): 统计结束时间。
 
         Returns:
-            pd.DataFrame: The IRT for the given time period.
+            pd.DataFrame: [C.DATE, C.R001, C.R007, C.SHIBOR_ON, C.SHIBOR_1W]。
         """
 
         self.start_time = start_time
@@ -61,6 +60,8 @@ class MarketUtil:
         # Filter the DataFrame to only include rows within the given time period
         mask = (self.raw[C.DATE] >= pd.to_datetime(self.start_time)) & (
                 self.raw[C.DATE] <= pd.to_datetime(self.end_time))
+
+        # print(self.raw.loc[mask])
 
         return self.raw.loc[mask]
 

@@ -62,7 +62,7 @@ option = st.sidebar.selectbox(
 
 if option == '收益测算':
 
-    if txn is not None and not dh.get_raw().empty:
+    if txn is not None and not dh.raw.empty:
 
         st.divider()
 
@@ -171,7 +171,7 @@ if option == '收益测算':
         st.write('无数据')
 
 if option == '业务统计':
-    if txn is not None and not dh.get_raw().empty:
+    if txn is not None and not dh.raw.empty:
         st.divider()
         st.write("### 持仓概览")
         holded_bonds = dh.get_holding_bonds_endtime()

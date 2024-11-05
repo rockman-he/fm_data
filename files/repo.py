@@ -15,7 +15,7 @@ from utils.db_util import Constants as C
 import streamlit_echarts
 from pyecharts.globals import ThemeType
 
-from utils.txn_factory import TxFactory
+from utils.txn_factory import FundTxFactory
 from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global
 
 # set_page_config必须放在开头，不然会报错
@@ -60,8 +60,8 @@ with st.form("tx"):
 dh = {'party': pd.DataFrame({})}
 
 if txn_submit:
-    txn = TxFactory(Repo).create_txn(start_time, end_time, cps_type)
-    dh = FundDataHandler(txn).get_txn_header()
+    txn = FundTxFactory(Repo).create_txn(start_time, end_time, cps_type)
+    dh = FundDataHandler(txn).all_data_show()
 
 if (dh['party']).empty:
     st.write("无数据")
@@ -72,6 +72,8 @@ else:
     st.divider()
     st.markdown("### 每日余额利率情况")
     st.write("###  ")
+
+    # print(dh['holded'])
 
     # 回购业务的日均余额曲线
     line_amt = fund_line_global(dh['holded'], C.AS_DT, C.TRADE_AMT, "日均余额（亿元）")

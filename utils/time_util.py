@@ -6,23 +6,20 @@
 from datetime import datetime, timedelta, date
 
 
-# TimeUtil class
-# This class contains static methods for handling time-related operations.
 class TimeUtil:
 
     @staticmethod
     def get_current_and_last_month_dates(moment: datetime = datetime.now()) -> tuple[datetime, datetime, datetime]:
         """
-        This function returns the start date of the current month and the start and end dates of the last month.
+        返回当前月份的开始日期，以及上个月的开始和结束日期。
 
-        :param moment: A datetime object representing the current moment. If not provided, defaults to the current
-        datetime.
-        :type moment: datetime, optional
-        :return: A tuple containing three datetime objects.
-        The first object is the start date of the current month,
-        the second object is the start date of the last month,
-        and the third object is the end date of the last month.
-        :rtype: tuple[datetime, datetime, datetime]
+        :param moment: 基准时间的 datetime 对象，默认为当前 datetime。
+        :return: 包含三个 datetime 对象的元组。
+        第一个是当前月份的开始日期，
+        第二个是上个月的开始日期，
+        第三个是上个月的结束日期。
+        tuple[datetime, datetime, datetime]
+
         """
 
         # Calculate the start date of the current month
@@ -37,15 +34,14 @@ class TimeUtil:
     @staticmethod
     def get_current_and_last_year(dates: datetime = datetime.now()) -> tuple[datetime, datetime]:
         """
-        This function returns the start date of the current year and the start date of the last year.
+        该函数返回当前年份的开始日期和去年的开始日期。
 
-        :param dates: A datetime object representing the current moment. If not provided, defaults to the current
-        datetime.
+        :param dates: 基准时间的 datetime 对象，默认为当前 datetime。
         :type dates: datetime, optional
-        :return: A tuple containing two datetime objects.
-        The first object is the start date of the current year,
-        and the second object is the start date of the last year.
-        :rtype: tuple[datetime, datetime]
+        :return: 包含两个 datetime 对象的元组。
+        第一个对象是当前年份的开始日期，
+        第二个对象是去年的开始日期。
+
         """
         # Calculate the start date of the current year
         func_this_year_start = datetime(dates.year, 1, 1)
@@ -57,12 +53,12 @@ class TimeUtil:
     @staticmethod
     def get_months_feday(year_num: int) -> list[tuple[date, date]]:
         """
-        This function returns a list of tuples, each containing the start and end dates of each month in the specified year.
+        该函数返回一个包含元组的列表，每个元组包含指定年份中每个月的开始和结束日期（截至到前一天（含））
 
-        :param year_num: The year for which the monthly start and end dates are to be calculated.
+        :param year_num: 要计算每月开始和结束日期的年份。
         :type year_num: int
-        :return: A list of tuples, where each tuple contains two date objects representing the start and end dates of a month.
-        :rtype: list[tuple[date, date]]
+        :return: 一个包含元组的列表，每个元组包含表示某个月的开始和结束日期的两个日期对象。
+
         """
 
         months = []
@@ -71,6 +67,7 @@ class TimeUtil:
         current_year = current_date.year
         current_month = current_date.month
 
+        # 非当前年的处理
         if year_num < current_year:
             for month in range(1, 13):
                 start_date = date(year_num, month, 1)
@@ -79,6 +76,7 @@ class TimeUtil:
                 else:
                     end_date = date(year_num, month + 1, 1) - timedelta(days=1)
                 months.append((start_date, end_date))
+        # 当前年处理
         else:
             for month in range(1, current_month + 1):
                 start_date = date(year_num, month, 1)
