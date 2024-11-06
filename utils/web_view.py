@@ -232,3 +232,100 @@ def pie_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str):
         )
     )
     return pie
+
+
+def main_fundtx_chart(df: pd.DataFrame, yaxis1_name, yaxis2_name, yaxis3_name):
+    month_list = df.index.month.astype(str) + '月'
+    month_list = month_list.tolist()
+
+    bar = (
+        Bar()
+        # .add_xaxis(df.index.dt.strftime('%Y-%m-%d').values.tolist())
+        .add_xaxis(month_list)
+        .add_yaxis(series_name=yaxis1_name,
+                   # 相同组间的柱体间距
+                   gap=0,
+                   # 不同组间的柱体间距
+                   category_gap="50%",
+                   y_axis=(df[C.AVG_AMT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
+                   markpoint_opts=opts.MarkPointOpts(
+                       data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
+                       label_opts=(LabelOpts(font_size=9))),
+                   # 控制透明度
+                   itemstyle_opts=opts.ItemStyleOpts(color="rgba(16, 78, 139, 0.8)"))
+        .add_yaxis(series_name=yaxis2_name,
+                   y_axis=(df[C.INST_DAYS] / 10000).apply(lambda x: '%.2f' % x).values.tolist(),
+                   yaxis_index=1,
+                   gap=0,
+                   category_gap="50%",
+                   markpoint_opts=opts.MarkPointOpts(
+                       data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
+                       label_opts=(LabelOpts(font_size=9))),
+                   itemstyle_opts=opts.ItemStyleOpts(color="rgba(238, 173, 14, 0.8)"))
+        .extend_axis(
+            yaxis=opts.AxisOpts(
+                name='',
+                position="right",
+                axislabel_opts=opts.LabelOpts(formatter="{value}"),
+                max_='{:.2f}'.format(df[C.INST_DAYS].max() / 10000 * 3),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="#eead0e")
+                ),
+                # 去掉该坐标系的间隔线
+                splitline_opts=opts.SplitLineOpts(is_show=False),
+            ),
+        )
+        .extend_axis(
+            yaxis=opts.AxisOpts(
+                name="",
+                type_="value",
+                min_=0,
+                max_='{:.2f}'.format(df[C.WEIGHT_RATE].max() * 1.2),
+                interval=2,
+                # 和其他y坐标轴的间距
+                offset=70,
+                axislabel_opts=opts.LabelOpts(formatter="{value} %"),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="red")
+                ),
+                splitline_opts=opts.SplitLineOpts(is_show=False),
+            ),
+        )
+        .set_series_opts(areastyle_opts=opts.AreaStyleOpts(opacity=0.5),
+                         # bar_category_gap="90%",
+                         label_opts=opts.LabelOpts(is_show=False))
+        .set_global_opts(
+
+            # 以十字交叉坐标指针显示
+            tooltip_opts=opts.TooltipOpts(
+                is_show=True, trigger="axis", axis_pointer_type="cross"
+            ),
+            xaxis_opts=opts.AxisOpts(axislabel_opts=opts.LabelOpts(rotate=-20)),
+            yaxis_opts=opts.AxisOpts(
+                max_='{:.2f}'.format(df[C.AVG_AMT].max() / 100000000 * 1.3),
+                splitline_opts=opts.SplitLineOpts(is_show=False),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="#104e8b")
+                ),
+            )
+        )
+    )
+
+    line = (
+        Line()
+        # .add_xaxis(xaxis_data=df[C.DATE].dt.strftime('%Y-%m-%d').values.tolist())
+        .add_xaxis(month_list)
+        .add_yaxis(
+            series_name=yaxis3_name,
+            yaxis_index=2,
+            y_axis=df[C.WEIGHT_RATE].apply(lambda x: '%.2f' % x).values.tolist(),
+            label_opts=opts.LabelOpts(is_show=False),
+            color='rgba(255, 48, 48, 0.8)',
+            markpoint_opts=opts.MarkPointOpts(
+                data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
+                label_opts=(LabelOpts(font_size=9))),
+            is_smooth=True
+        )
+    )
+
+    return bar.overlap(line)

@@ -277,7 +277,7 @@ class FundDataHandler:
             months = TimeUtil.get_months_feday(start_time.year)
 
             # 生成一个包含每个月最后一天的日期索引的DataFrame
-            dates = [end for _, end in months]
+            dates = pd.to_datetime([end for _, end in months])
             df = pd.DataFrame(index=dates, columns=[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE])
             df[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]] = 0
 
@@ -895,6 +895,28 @@ class SecurityDataHandler:
         return df
 
 
+class OverviewDataHandler():
+    """
+    按年统计所有交易数据的类，包括资金交易和固收交易。
+    主要用于主页的环比，同比统计
+    """
+
+    def __init__(self, year_num: int):
+        """
+        构造函数
+        :param year_num: 年份
+        """
+
+        # 资金交易数据
+        self.fund_tx = None
+        # 固收交易数据
+        self.sety_tx = None
+
+        self.y = year_num
+
+    # def create_fundtx(self, direction: str) -> None:
+
+
 def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0) -> pd.DataFrame:
     """
     生成资金交易的月度报告。
@@ -919,7 +941,49 @@ def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str,
     txn = FundTxFactory(txn_type).create_txn(start_time, end_time, direction)
     txn_data = FundDataHandler(txn).get_monthly_summary(mark_rate, direction)
 
+    txn_data.index.name = C.DATE
+
     return txn_data
+
+
+def fundtx_monthly_report_yoy(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0,
+                              mark_rate_p: float = 0) -> pd.DataFrame:
+    """
+    生成资金交易year_num和前一年的月度报告，用于测算同比。
+
+    该函数根据指定的年份、交易类型和方向创建一个交易对象，然后基于提供的基准利率生成该年各月的统计情况。
+
+    Args:
+        year_num (int): 报告生成的年份。
+        txn_type (Type[FundTx]): 资金交易的类型。
+        direction (str): 交易的方向（例如，'正回购'，'同业拆入'）。
+        mark_rate (float, optional): 基准年份的测算利率，用于计算套利收入的基准利率，默认为 0。
+        mark_rate_p (float, optional): 基准年份前一年的测算利率，默认为 0。
+
+    Returns:
+        pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
+                      [C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE,[前面数值列名+'_P']]
+    """
+
+    current = fundtx_monthly_report(year_num, txn_type, direction, mark_rate)
+    previous = fundtx_monthly_report(year_num - 1, txn_type, direction, mark_rate_p)
+
+    # 如果任意一个为空，则添加列后返回
+    if current.empty or previous.empty:
+        cols = [col + '_P' for col in current.columns]
+        current.loc[:, cols] = 0
+        return current
+
+    # 创建包含月份的列，以便按月份进行匹配
+    current['Month'] = current.index.month
+    previous['Month'] = previous.index.month
+
+    current = current.reset_index()
+
+    merged_df = pd.merge(current, previous, on='Month', suffixes=('', '_P'), how='left').drop(columns=['Month'])
+    merged_df = merged_df.set_index(C.DATE)
+
+    return merged_df
 
 
 def security_monthly_report(year_num: int, txn_type: Type[SecurityTx]) -> pd.DataFrame:
