@@ -16,23 +16,21 @@ class FundTx:
     Attributes:
         start_time (datetime.date): 交易开始时间.
         end_time (datetime.date): 交易截止统计时间（含）.
-        direction (str): 交易方向.
         inst_base (int): 计息计算基数.
         raw (pd.DataFrame): 交易数据.
     """
 
-    def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
+    def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         """
         FundTx的构造函数.
 
         Args:
             start_time (datetime.date): 交易的开始时间.
             end_time (datetime.date): 交易截止统计时间（含）.
-            direction (str): 交易方向.
         """
         self.start_time = start_time
         self.end_time = end_time
-        self.direction = direction
+        # self.direction = direction
         self.inst_base = 365
         self.raw = None
 
@@ -88,16 +86,24 @@ class FundTx:
 
         return raw
 
-    def daily_data(self) -> pd.DataFrame:
+    def daily_data(self, direction: int) -> pd.DataFrame:
         """
         获取统计区间内每日持仓的统计数据.
 
+        :param direction: 交易方向，资金融入（正回购4，同业拆入1），资金融出（逆回购1，同业拆出4），坑爹玩意儿
+
         Returns:
             pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
+
         """
 
         if self.raw.empty:
             return pd.DataFrame({})
+
+        r = self.raw.loc[self.raw[C.DIRECTION] == direction, :]
+
+        if r.empty:
+            return r
 
         date_range = pd.date_range(start=self.start_time, end=self.end_time, freq='D')
         daily = pd.DataFrame(date_range, columns=[C.AS_DT])
@@ -105,15 +111,15 @@ class FundTx:
         daily[C.INST_DAYS] = 0.0
 
         # 遍历数据库查询结果
-        for row in self.raw.index:
+        for row in r.index:
             # 回购金额
-            trade_amt = self.raw.loc[row, C.TRADE_AMT]
+            trade_amt = r.loc[row, C.TRADE_AMT]
             # 满足统计区间的起始时间
-            as_date = self.raw.loc[row, C.AS_DT]
+            as_date = r.loc[row, C.AS_DT]
             # 满足统计区间的截止统计时间
-            ae_date = self.raw.loc[row, C.AE_DT]
+            ae_date = r.loc[row, C.AE_DT]
             # 每天的利息
-            inst_a_day = self.raw.loc[row, C.INST_A_DAY]
+            inst_a_day = r.loc[row, C.INST_A_DAY]
 
             # 将起止时间段的余额和利息总额进行汇总
             mask = (daily[C.AS_DT] >= as_date) & (daily[C.AS_DT] < ae_date)
@@ -193,19 +199,52 @@ class FundTx:
     #         C.MIN_RATE: occ_stats[C.RATE].min()
     #     }
 
-    def groupby_column(self, column: str) -> pd.DataFrame:
+    def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
+
+        """
+        按交易方向分类源数据.
+
+        Args:
+            direction (str): 交易方向['正回购', '逆回购','同业拆入','同业拆出'].
+
+        Returns:
+            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
+        """
+
+        pass
+
+    def raw_by_direction(self, direction: int) -> pd.DataFrame:
+        """
+        按交易方向分类源数据.
+
+        Args:
+            direction (int): 交易方向.
+
+        Returns:
+
+        """
+
+        if self.raw.empty:
+            return pd.DataFrame({})
+
+        return self.raw.loc[self.raw[C.DIRECTION] == direction]
+
+    def groupby_column(self, column: str, direction: int) -> pd.DataFrame:
         """
         将原始数据按照特定列group聚合.
 
         Args:
             column (str): 被聚合的列.
+            direction(int): 交易方向，资金融入（正回购4，同业拆入1），资金融出（逆回购1，同业拆出4）
 
         Returns:
             pd.DataFrame: [column, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
         """
 
+        raw = self.raw_by_direction(direction)
+
         # 按期限类型进行分组
-        txn_group = self.raw.groupby(self.raw[column])
+        txn_group = raw.groupby(raw[column])
         # 利息加总
         inst_group = txn_group[C.INST_DAYS].agg("sum")
         # 积数加总
@@ -235,23 +274,21 @@ class Repo(FundTx):
     Attributes:
         start_time (datetime.date): 交易的开始统计时间.
         end_time (datetime.date): 交易截止统计时间（含）.
-        direction (str): 交易方向.
     """
 
     # TODO 还缺少买断式回购、交易所回购的统计，同时要补全机构的code
-    def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
+    def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         """
         构造函数.
 
         Args:
             start_time (datetime.date): 交易的开始统计时间.
             end_time (datetime.date): 交易截止统计时间（含）.
-            direction (str): 交易方向.
         """
 
-        super().__init__(start_time, end_time, direction)
+        super().__init__(start_time, end_time)
 
-        self.direction = '4' if self.direction == '正回购' else '1'
+        # self.direction = '4' if self.direction == '正回购' else '1'
         sql = f"select " \
               f"tc.{C.TRADE_NO}, " \
               f"tc.{C.TERM_TYPE}, " \
@@ -276,8 +313,8 @@ class Repo(FundTx):
               f"' and tc.{C.SETTLEMENT_DATE} <= '" + \
               self.end_time.strftime('%Y-%m-%d') + \
               f"' and tc.{C.CHECK_STATUS} = 1" \
-              f" and tc.{C.DIRECTION} = " + self.direction + \
               f" order by tc.{C.SETTLEMENT_DATE};"
+        # f" and tc.{C.DIRECTION} = " + self.direction + \
 
         self.raw = self._get_raw_data(sql)
 
@@ -303,22 +340,39 @@ class Repo(FundTx):
 
         return raw
 
+    def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
+        """
+        按交易方向分类源数据.
+
+        Args:
+            direction (str): 交易方向.
+
+        Returns:
+            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
+        """
+
+        if self.raw.empty or direction not in ['正回购', '逆回购']:
+            return pd.DataFrame({})
+
+        d = 4 if direction == '正回购' else 1
+
+        return super().daily_data(d)
+
 
 class IBO(FundTx):
 
-    def __init__(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> None:
+    def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         """
         构造函数.
 
         Args:
             start_time (datetime.date): 交易的开始统计时间.
             end_time (datetime.date): 交易截止统计时间（含）.
-            direction (str): 交易方向.
         """
 
-        super().__init__(start_time, end_time, direction)
+        super().__init__(start_time, end_time)
         self.inst_base = 360
-        self.direction = '1' if self.direction == '同业拆入' else '4'
+        # self.direction = '1' if self.direction == '同业拆入' else '4'
 
         sql = f"select " \
               f"ti.{C.COUNTERPARTY}, " \
@@ -344,8 +398,8 @@ class IBO(FundTx):
               f"' and ti.{C.SETTLEMENT_DATE} <= '" + \
               self.end_time.strftime('%Y-%m-%d') + \
               f"' and ti.{C.CHECK_STATUS} = 1 " \
-              f" and ti.{C.DIRECTION} = " + self.direction + \
               f" order by ti.{C.SETTLEMENT_DATE};"
+        # f" and ti.{C.DIRECTION} = " + self.direction + \
 
         self.raw = self._get_raw_data(sql)
 
@@ -385,11 +439,35 @@ class IBO(FundTx):
 
         return raw1
 
+    def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
+        """
+        按交易方向分类源数据.
+
+        Args:
+            direction (str): 交易方向.
+
+        Returns:
+            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
+        """
+
+        if self.raw.empty or direction not in ['同业拆入', '同业拆出']:
+            return pd.DataFrame({})
+
+        d = 1 if direction == '同业拆入' else 4
+
+        return super().daily_data(d)
+
 
 if __name__ == '__main__':
-    s_t = datetime.date(2017, 1, 1)
-    e_t = datetime.date(2017, 12, 31)
-    # repo = Repo(s_t, e_t, '正回购')
-    # print(repo.daily_data(s_t, e_t, '正回购'))
-    ibo = IBO(s_t, e_t, '同业拆入')
-    print(ibo.daily_data())
+    s_t = datetime.date(2023, 11, 14)
+    e_t = datetime.date(2023, 11, 20)
+    repo = Repo(s_t, e_t)
+
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(type(repo.raw.iloc[0][C.DIRECTION]))
+
+    print(repo.daily_data_by_direction('正回购'))
+    print(repo.daily_data_by_direction('逆回购'))
+
+    # ibo = IBO(s_t, e_t, '同业拆入')
+    # print(ibo.daily_data())

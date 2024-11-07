@@ -7,6 +7,7 @@ from datetime import datetime
 import streamlit as st
 
 from bond_tx import CDTx
+from utils.txn_factory import TxFactory
 from utils.web_data import SecurityDataHandler
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
@@ -53,7 +54,7 @@ with st.form("CD"):
     txn_submit = st.form_submit_button('查  询')
 
 if txn_submit:
-    txn = CDTx(start_time, end_time)
+    txn = TxFactory(CDTx).create_txn(start_time, end_time)
     dh = SecurityDataHandler(txn)
 
 option = st.sidebar.selectbox(

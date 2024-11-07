@@ -15,7 +15,7 @@ from utils.db_util import Constants as C
 import streamlit_echarts
 from pyecharts.globals import ThemeType
 
-from utils.txn_factory import FundTxFactory
+from utils.txn_factory import TxFactory
 from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global
 
 # set_page_config必须放在开头，不然会报错
@@ -60,8 +60,11 @@ with st.form("ibo"):
 dh = {'party': pd.DataFrame({})}
 
 if txn_submit:
-    txn = FundTxFactory(IBO).create_txn(start_time, end_time, cps_type)
-    dh = FundDataHandler(txn).all_data_show()
+    # txn = TxFactory(IBO).create_txn(start_time, end_time, cps_type)
+    fh = FundDataHandler(TxFactory(IBO).create_txn(start_time, end_time))
+    fh.set_direction(cps_type)
+
+    dh = fh.all_data_show()
 
 if (dh['party']).empty:
     st.write("无数据")

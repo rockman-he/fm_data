@@ -14,7 +14,7 @@ from fund_tx import FundTx
 from utils.db_util import Constants as C
 from utils.market_util import MarketUtil
 from utils.time_util import TimeUtil
-from utils.txn_factory import FundTxFactory
+from utils.txn_factory import TxFactory
 
 
 # 将数据处理后显示到web页面上
@@ -24,6 +24,7 @@ class FundDataHandler:
 
     Attributes:
         tx (FundTx): 要显示的交易对象.
+        d (int): 交易方向，资金融入（正回购4，同业拆借1），资金融出（逆回购1，同业拆出4）
     """
 
     def __init__(self, txn: FundTx) -> None:
@@ -34,6 +35,17 @@ class FundDataHandler:
         """
 
         self.tx = txn
+        self.d = 100
+
+    def set_direction(self, direction: str):
+        self.d = 4 if direction == '正回购' or direction == '同业拆出' else 1
+
+    def check_set_d(self):
+        """
+        检查方向函数是否被设置. 如何没有，抛出错误警告.
+        """
+        if self.d == 100:
+            raise ValueError("Direction has not been set. Please set the direction before proceeding.")
 
     def daily_data(self) -> pd.DataFrame:
         """
@@ -43,7 +55,8 @@ class FundDataHandler:
             pd.DataFrame: [C.AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE, C.R001, C.R007, C.SHIBOR_ON, C.SHIBOR_1W]
         """
 
-        daily = self.tx.daily_data()
+        daily = self.tx.daily_data(self.d)
+        self.check_set_d()
         market_irt = MarketUtil().get_irt(self.tx.start_time, self.tx.end_time)
 
         if market_irt.empty or daily.empty:
@@ -60,11 +73,12 @@ class FundDataHandler:
         """
 
         # return self.tx.party_rank()
+        self.check_set_d()
 
-        if self.tx.raw.empty:
+        if self.tx.raw_by_direction(self.d).empty:
             return pd.DataFrame({})
 
-        party = self.tx.groupby_column(C.NAME)
+        party = self.tx.groupby_column(C.NAME, self.d)
 
         return party
 
@@ -144,14 +158,19 @@ class FundDataHandler:
         """
         按照各期限的日均余额进行排名，返回统计数据.
 
+        :arg
+            d (int): 交易方向，资金融入（正回购4，同业拆借1），资金融出（逆回购1，同业拆出4）
+
         Returns:
             pd.DataFrame: [C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE]
         """
 
-        if self.tx.raw.empty:
+        self.check_set_d()
+
+        if self.tx.raw_by_direction(self.d).empty:
             return pd.DataFrame({})
 
-        term = self.tx.groupby_column(C.TERM_TYPE)
+        term = self.tx.groupby_column(C.TERM_TYPE, self.d)
 
         return term
 
@@ -163,12 +182,17 @@ class FundDataHandler:
             Dict: {C.TRADE_NUM, C.TRADE_SUM, C.TRADE_WEIGHT_SUM, C.MAX_RATE, C.MIN_RATE}
         """
 
-        if self.tx.raw.empty:
+        self.check_set_d()
+
+        raw = self.tx.raw_by_direction(self.d)
+
+        if raw.empty:
             return {}
 
-        mask = ((self.tx.raw[C.SETTLEMENT_DATE] >= self.tx.start_time.strftime('%Y-%m-%d')) &
-                (self.tx.raw[C.SETTLEMENT_DATE] <= self.tx.end_time.strftime('%Y-%m-%d')))
-        occ_stats = self.tx.raw[mask]
+        mask = ((raw[C.SETTLEMENT_DATE] >= self.tx.start_time.strftime('%Y-%m-%d')) &
+                (raw[C.SETTLEMENT_DATE] <= self.tx.end_time.strftime('%Y-%m-%d')))
+
+        occ_stats = raw[mask]
 
         return {
             # 交易笔数
@@ -176,7 +200,7 @@ class FundDataHandler:
             # 交易总额（按发生）
             C.TRADE_SUM: occ_stats[C.TRADE_AMT].sum(),
             # 交易金额（按加权）
-            C.TRADE_WEIGHT_SUM: self.tx.raw[C.TRADE_AMT].sum(),
+            C.TRADE_WEIGHT_SUM: raw[C.TRADE_AMT].sum(),
             # 单笔利率(最大）
             C.MAX_RATE: occ_stats[C.RATE].max(),
             # 单笔利率(最小）
@@ -270,7 +294,9 @@ class FundDataHandler:
         start_time = self.tx.start_time
         inst_base = self.tx.inst_base
 
-        dh = self.tx.daily_data()
+        self.check_set_d()
+
+        dh = self.tx.daily_data(self.d)
 
         # 如果无交易，则返回一个都为0的df
         if dh.empty:
@@ -895,7 +921,7 @@ class SecurityDataHandler:
         return df
 
 
-class OverviewDataHandler():
+class OverviewDataHandler:
     """
     按年统计所有交易数据的类，包括资金交易和固收交易。
     主要用于主页的环比，同比统计
@@ -938,8 +964,11 @@ def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str,
     start_time = months[0][0]
     end_time = months[-1][1]
 
-    txn = FundTxFactory(txn_type).create_txn(start_time, end_time, direction)
-    txn_data = FundDataHandler(txn).get_monthly_summary(mark_rate, direction)
+    # txn = TxFactory(txn_type).create_txn(start_time, end_time)
+
+    tx_handler = FundDataHandler(TxFactory(txn_type).create_txn(start_time, end_time))
+    tx_handler.set_direction(direction)
+    txn_data = tx_handler.get_monthly_summary(mark_rate, direction)
 
     txn_data.index.name = C.DATE
 

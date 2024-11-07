@@ -4,48 +4,55 @@
 # Description: This module contains a factory class for creating transaction objects.
 
 import datetime
-from typing import Type
+from typing import Type, Union
 
+from bond_tx import SecurityTx, BondTx
 from fund_tx import FundTx, Repo, IBO
 
 
-class FundTxFactory:
+class TxFactory:
     """
-    资金交易的工厂类.
+    交易的工厂类.
 
     Args:
         txn_factory: 创建对象类型.
     """
 
-    def __init__(self, txn_factory: Type[FundTx]) -> None:
+    def __init__(self, txn_factory: Union[Type[FundTx], Type[SecurityTx]]) -> None:
         """
         构造函数
 
         Args:
-            txn_factory (Type[FundTx]): 被创建对象类型.
+            txn_factory (Union[Type[FundTx], Type[SecurityTx]]): 被创建对象类型.
         """
 
         self.tx_factory = txn_factory
 
-    def create_txn(self, start_time: datetime.date, end_time: datetime.date, direction: str) -> FundTx:
+    def create_txn(self, start_time: datetime.date, end_time: datetime.date) -> Union[FundTx, SecurityTx]:
         """
-        创建一个具体的资金交易类.
+        创建一个具体的交易类.
 
         Args:
             start_time (datetime.date): 统计开始时间
             end_time (datetime.date): 统计结束时间
-            direction (str): 交易方向
 
         Returns:
-            FundTx: 资金交易类.
+            Union[FundTx, SecurityTx]: 交易类.
         """
 
-        txn = self.tx_factory(start_time, end_time, direction)
+        txn = self.tx_factory(start_time, end_time)
         return txn
 
 
 if __name__ == "__main__":
     s_t = datetime.date(2023, 1, 1)
     e_t = datetime.date(2023, 12, 31)
-    repo = FundTxFactory(Repo).create_txn(s_t, e_t, "正回购")
-    ibo = FundTxFactory(IBO).create_txn(s_t, e_t, "拆借")
+    repo = TxFactory(Repo).create_txn(s_t, e_t)
+    ibo = TxFactory(IBO).create_txn(s_t, e_t)
+
+    bond = TxFactory(BondTx).create_txn(s_t, e_t)
+    # bond.daily_data_by_direction('逆回购')
+
+    print(repo.daily_data_by_direction('逆回购'))
+    # print(bond.daily_data_by_direction('同业拆入'))
+    print(bond.get_net_profit('112303195.IB'))

@@ -7,6 +7,7 @@ import streamlit as st
 
 from bond_tx import SecurityTx
 from utils.time_util import TimeUtil
+from utils.txn_factory import TxFactory
 from utils.web_data import SecurityDataHandler
 
 # set_page_config必须放在开头，不然会报错
@@ -45,7 +46,8 @@ with st.form("test"):
     txn_submit = st.form_submit_button('查  询')
 
 if txn_submit:
-    txn = SecurityTx(start_time, end_time)
+    # txn = SecurityTx(start_time, end_time)
+    txn = TxFactory(SecurityTx).create_txn(start_time, end_time)
 
 bond_code = '112303195.IB'
 

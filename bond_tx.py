@@ -234,11 +234,13 @@ class SecurityTx:
 
         Parameters
         ----------
-        bond_code : str
-            债券代码
+            bond_code : str
+                债券代码
 
-        Returns:
-            pd.DataFrame: [C.DATE, C.INST_A_DAY]
+        Returns
+        -------
+            pd.DataFrame
+                [C.DATE, C.INST_A_DAY]
 
         """
 
