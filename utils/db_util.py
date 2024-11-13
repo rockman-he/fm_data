@@ -223,6 +223,22 @@ class Constants:
     BOND_CUST = 'bond_cust'
     # 利率债代码
     INST_BOND_NUM = {0, 1, 6, 11}
+    # 交易类型
+    TX_TYPE = 'tx_type'
+    # 正回购
+    REPO = 'repo'
+    # 逆回购
+    REPL = 'repl'
+    # 同业拆入
+    IBO = 'ibo'
+    # 同业拆出
+    IBL = 'ibl'
+    # 债券业务
+    BOND = 'bond'
+    # 同业存单
+    CD = 'cd'
+    # 同比
+    YOY = '_yoy'
 
 
 @st.cache_resource

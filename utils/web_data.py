@@ -5,12 +5,12 @@
 # which provides methods for displaying transaction data on a web page.
 from datetime import datetime, timedelta
 
-from typing import Dict, List, Type
+from typing import Dict, List, Type, Union
 
 import pandas as pd
 
-from bond_tx import SecurityTx
-from fund_tx import FundTx
+from bond_tx import SecurityTx, BondTx, CDTx
+from fund_tx import FundTx, Repo, IBO
 from utils.db_util import Constants as C
 from utils.market_util import MarketUtil
 from utils.time_util import TimeUtil
@@ -24,7 +24,7 @@ class FundDataHandler:
 
     Attributes:
         tx (FundTx): 要显示的交易对象.
-        d (int): 交易方向，资金融入（正回购4，同业拆借1），资金融出（逆回购1，同业拆出4）
+        d (int): 交易方向，资金融入为4，资金融出为1
     """
 
     def __init__(self, txn: FundTx) -> None:
@@ -38,7 +38,7 @@ class FundDataHandler:
         self.d = 100
 
     def set_direction(self, direction: str):
-        self.d = 4 if direction == '正回购' or direction == '同业拆出' else 1
+        self.d = 4 if direction == C.REPO or direction == C.IBO else 1
 
     def check_set_d(self):
         """
@@ -159,7 +159,7 @@ class FundDataHandler:
         按照各期限的日均余额进行排名，返回统计数据.
 
         :arg
-            d (int): 交易方向，资金融入（正回购4，同业拆借1），资金融出（逆回购1，同业拆出4）
+            d (int): 交易方向，资金融入为4，资金融出为1
 
         Returns:
             pd.DataFrame: [C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE]
@@ -279,15 +279,14 @@ class FundDataHandler:
 
         }
 
-    def get_monthly_summary(self, mark_rate, flag: str) -> pd.DataFrame:
+    def get_monthly_summary(self, mark_rate: float = 0) -> pd.DataFrame:
         """
         按月度分组，返回月度统计数据
 
         注意：内部对象FundTx的统计截至时间为当前时间的前一天
 
         :param mark_rate: 用于计算套息的基准利率
-        :param flag: 交易方向，因数据库设计缺陷，这里额外做了重复标识
-        :return: [C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]
+        :return: [C.DATE, C.TYPE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]
         """
 
         # start_time = self.tx.get_stime()
@@ -304,8 +303,11 @@ class FundDataHandler:
 
             # 生成一个包含每个月最后一天的日期索引的DataFrame
             dates = pd.to_datetime([end for _, end in months])
-            df = pd.DataFrame(index=dates, columns=[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE])
+            df = pd.DataFrame(index=dates, columns=[C.TX_TYPE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE])
             df[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]] = 0
+            df[C.TX_TYPE] = ''
+
+            df.index.name = C.DATE
 
             return df
 
@@ -326,7 +328,7 @@ class FundDataHandler:
         # 重置为0，方便下面的计算
         dh_monthly.loc[:, C.INST_GROUP] = 0.0
 
-        if flag == '正回购' or flag == '同业拆入':
+        if self.d == 4:
             # 计算套息收入
             dh_monthly[C.INST_GROUP] = (dh_monthly[C.AVG_AMT] * (mark_rate - dh_monthly[C.WEIGHT_RATE]) /
                                         100 * dh_monthly.index.days_in_month / inst_base)
@@ -352,11 +354,13 @@ class FundDataHandler:
                       dh_monthly.iloc.iloc[-1, avg_amt]) * 100)
 
             # 计算套息收入
-            if flag == '正回购' or flag == '同业拆入':
+            if self.d == 4:
                 dh_monthly[C.INST_GROUP] = \
                     (dh_monthly[C.AVG_AMT] * (mark_rate - dh_monthly[C.WEIGHT_RATE]) / 100 * days_interval / inst_base)
 
-        dh_monthly = dh_monthly[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]].rename_axis(C.DATE)
+        dh_monthly[C.TX_TYPE] = ''
+
+        dh_monthly = dh_monthly[[C.TX_TYPE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]].rename_axis(C.DATE)
 
         return dh_monthly
 
@@ -481,9 +485,12 @@ class SecurityDataHandler:
             months = TimeUtil.get_months_feday(start_time.year)
 
             # 生成一个包含每个月最后一天的日期索引的DataFrame
-            dates = [end for _, end in months]
+            dates = pd.to_datetime([end for _, end in months])
+            # dates = [end for _, end in months]
             df = pd.DataFrame(index=dates, columns=[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE])
             df[[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]] = 0
+
+            df.index.name = C.DATE
 
             return df
 
@@ -520,6 +527,8 @@ class SecurityDataHandler:
 
         dh_monthly = dh_monthly[[C.AVG_AMT, C.INST_A_DAY, C.CAPITAL_GAINS, C.WEIGHT_RATE]].rename(
             columns={C.INST_A_DAY: C.INST_DAYS}).rename_axis(C.DATE)
+
+        # dh_monthly.index.name = C.DATE
 
         return dh_monthly
 
@@ -933,114 +942,255 @@ class OverviewDataHandler:
         :param year_num: 年份
         """
 
-        # 资金交易数据
-        self.fund_tx = None
-        # 固收交易数据
-        self.sety_tx = None
+        self.tx_data_dict = {
+            C.REPO: pd.DataFrame({}),
+            C.REPL: pd.DataFrame({}),
+            C.IBO: pd.DataFrame({}),
+            C.IBL: pd.DataFrame({}),
+            C.BOND: pd.DataFrame({}),
+            C.CD: pd.DataFrame({})
+        }
 
         self.y = year_num
 
+    def fund_monthly_report_yoy(self, tx_type: Union[C.REPO, C.REPL, C.IBO, C.IBL], mark_rate: float = 0,
+                                mark_rate_p: float = 0) -> pd.DataFrame:
+        """
+        生成资金交易year_num年和前一年的月度报告，用于测算同比。
+
+        该函数根据指定的年份、交易类型和方向创建一个交易对象，然后基于提供的基准利率生成该年各月的统计情况。
+
+        Args:
+            tx_type (str): 四种类型C.REPO, C.REPL, C.IBO, C.IBL。
+            mark_rate (float, optional): 基准年份的测算利率，用于计算套利收入的基准利率，默认为 0。
+            mark_rate_p (float, optional): 基准年份前一年的测算利率，默认为 0。
+
+        Returns:
+            pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
+                          [C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE, C.TX_TYPE, [前面数值列名+'_P']]
+        """
+
+        if not self.tx_data_dict[tx_type].empty:
+            return self.tx_data_dict[tx_type]
+
+        current = self.fund_monthly_report(tx_type, mark_rate)
+        self.y -= 1
+
+        # print(current)
+
+        previous = self.fund_monthly_report(tx_type, mark_rate_p)
+        self.y += 1
+
+        # print(previous)
+
+        # current_cols = current.columns.drop(C.TX_TYPE)
+
+        # 如果任意一个为空，则添加列后返回
+        # if current.empty or previous.empty:
+        #     cols = [col + '_P' for col in current.columns]
+        #     current.loc[:, cols] = 0
+        #     return current
+
+        # 创建包含月份的列，以便按月份进行匹配
+        current['Month'] = current.index.month
+        previous['Month'] = previous.index.month
+
+        current = current.reset_index()
+
+        merged_df = pd.merge(current, previous, on='Month', suffixes=('', '_P'), how='left').drop(columns=['Month'])
+        merged_df = merged_df.set_index(C.DATE)
+
+        merged_df.drop(columns=[C.TX_TYPE + '_P'], inplace=True)
+
+        # for col in current_cols:
+        #     # print(col)
+        #     merged_df[col + C.YOY] = ((merged_df[col] - merged_df[col + '_P']) /
+        #                               merged_df[col + '_P'] * 100)
+
+        mask = merged_df[C.INST_DAYS + '_P'] != 0
+        merged_df[C.INST_DAYS + C.YOY] = 0.0
+        merged_df.loc[mask, C.INST_DAYS + C.YOY] = ((merged_df.loc[mask, C.INST_DAYS] -
+                                                     merged_df.loc[mask, C.INST_DAYS + '_P']) /
+                                                    merged_df.loc[mask, C.INST_DAYS + '_P'] * 100)
+
+        # merged_df[C.TOTAL_PROFIT] = merged_df[C.INST_DAYS]
+
+        self.tx_data_dict[tx_type] = merged_df
+
+        return merged_df
+
+    def fund_monthly_report(self, tx_type: Union[C.REPO, C.REPL, C.IBO, C.IBL],
+                            mark_rate: float = 0) -> pd.DataFrame:
+        """
+        生成资金交易的月度报告。
+
+        该函数根据指定的年份、交易类型和方向创建一个交易对象，然后基于提供的基准利率生成该年各月的统计情况。
+
+        Args:
+            tx_type (str): 四种类型C.REPO, C.REPL, C.IBO, C.IBL。。
+            mark_rate (float, optional): 用于计算套利收入的基准利率，默认为 0。
+
+        Returns:
+            pd.DataFrame: 包含月度汇总报告的 Dict，列包括:
+                          [C.DATE, C.TYPE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]
+        """
+
+        if tx_type not in [C.REPO, C.REPL, C.IBO, C.IBL]:
+            return pd.DataFrame({})
+
+        months = TimeUtil.get_months_feday(self.y)
+
+        start_time = months[0][0]
+        end_time = months[-1][1]
+
+        tx_hl = None
+
+        if tx_type in [C.REPO, C.REPL]:
+            tx_hl = FundDataHandler(TxFactory(Repo).create_txn(start_time, end_time))
+
+        if tx_type in [C.IBO, C.IBL]:
+            tx_hl = FundDataHandler(TxFactory(IBO).create_txn(start_time, end_time))
+
+        tx_hl.set_direction(tx_type)
+
+        tx_data = tx_hl.get_monthly_summary(mark_rate)
+        tx_data[C.TX_TYPE] = tx_type
+
+        return tx_data
+
     # def create_fundtx(self, direction: str) -> None:
 
+    def security_monthly_report(self, tx_type: Union[C.BOND, C.CD]) -> pd.DataFrame:
+        """
+        生成固收交易的月度报告。
 
-def fundtx_monthly_report(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0) -> pd.DataFrame:
-    """
-    生成资金交易的月度报告。
+        该函数根据指定的年份、交易类型创建一个交易对象，生成该年各月的统计情况。
 
-    该函数根据指定的年份、交易类型和方向创建一个交易对象，然后基于提供的基准利率生成该年各月的统计情况。
+        Args:
+            txn_type (str): 交易类型，C.BOND或C.CD。
 
-    Args:
-        year_num (int): 报告生成的年份。
-        txn_type (Type[FundTx]): 资金交易的类型。
-        direction (str): 交易的方向（例如，'正回购'，'同业拆入'）。
-        mark_rate (float, optional): 用于计算套利收入的基准利率，默认为 0。
+        Returns:
+            pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
+                          [C.DATE, C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]，收益率是不含净价浮盈的
+        """
+        months = TimeUtil.get_months_feday(self.y)
+        start_time = months[0][0]
+        end_time = months[-1][1]
 
-    Returns:
-        pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
-                      [C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE]
-    """
-    months = TimeUtil.get_months_feday(year_num)
+        if tx_type == C.BOND:
+            txn_type = BondTx
+        elif tx_type == C.CD:
+            txn_type = CDTx
+        else:
+            return pd.DataFrame({})
 
-    start_time = months[0][0]
-    end_time = months[-1][1]
+        txn_data = SecurityDataHandler(txn_type(start_time, end_time)).get_monthly_summary()
+        txn_data[C.TX_TYPE] = tx_type
 
-    # txn = TxFactory(txn_type).create_txn(start_time, end_time)
+        # txn_data.index.name = C.DATE
 
-    tx_handler = FundDataHandler(TxFactory(txn_type).create_txn(start_time, end_time))
-    tx_handler.set_direction(direction)
-    txn_data = tx_handler.get_monthly_summary(mark_rate, direction)
+        return txn_data
 
-    txn_data.index.name = C.DATE
+    def security_monthly_report_yoy(self, tx_type: Union[C.BOND, C.CD]) -> pd.DataFrame:
+        """
+        生成固收交易year_num年和前一年的月度报告，用于测算同比。
 
-    return txn_data
+        Args:
+            tx_type (str): 交易类型，C.BOND或C.CD。
 
+        Returns:
+            pd.DataFrame: 包含月度报告的 DataFrame，列包括:
+                          [C.DATE, C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE,C.TX_TYPE, [前面数值列名+'_P']]
+        """
 
-def fundtx_monthly_report_yoy(year_num: int, txn_type: Type[FundTx], direction: str, mark_rate: float = 0,
-                              mark_rate_p: float = 0) -> pd.DataFrame:
-    """
-    生成资金交易year_num和前一年的月度报告，用于测算同比。
+        if not self.tx_data_dict[tx_type].empty:
+            return self.tx_data_dict[tx_type]
 
-    该函数根据指定的年份、交易类型和方向创建一个交易对象，然后基于提供的基准利率生成该年各月的统计情况。
+        current = self.security_monthly_report(tx_type)
+        self.y -= 1
 
-    Args:
-        year_num (int): 报告生成的年份。
-        txn_type (Type[FundTx]): 资金交易的类型。
-        direction (str): 交易的方向（例如，'正回购'，'同业拆入'）。
-        mark_rate (float, optional): 基准年份的测算利率，用于计算套利收入的基准利率，默认为 0。
-        mark_rate_p (float, optional): 基准年份前一年的测算利率，默认为 0。
+        # print(current)
 
-    Returns:
-        pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
-                      [C.DATE, C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE,[前面数值列名+'_P']]
-    """
+        previous = self.security_monthly_report(tx_type)
+        self.y += 1
 
-    current = fundtx_monthly_report(year_num, txn_type, direction, mark_rate)
-    previous = fundtx_monthly_report(year_num - 1, txn_type, direction, mark_rate_p)
+        # 如果任意一个为空，则添加列后返回
+        # if current.empty or previous.empty:
+        #     cols = [col + '_P' for col in current.columns]
+        #     current.loc[:, cols] = 0
+        #     return current
 
-    # 如果任意一个为空，则添加列后返回
-    if current.empty or previous.empty:
-        cols = [col + '_P' for col in current.columns]
-        current.loc[:, cols] = 0
-        return current
+        # 创建包含月份的列，以便按月份进行匹配
+        current['Month'] = current.index.month
+        previous['Month'] = previous.index.month
 
-    # 创建包含月份的列，以便按月份进行匹配
-    current['Month'] = current.index.month
-    previous['Month'] = previous.index.month
+        current = current.reset_index()
 
-    current = current.reset_index()
+        merged_df = pd.merge(current, previous, on='Month', suffixes=('', '_P'), how='left').drop(columns=['Month'])
+        merged_df = merged_df.set_index(C.DATE)
 
-    merged_df = pd.merge(current, previous, on='Month', suffixes=('', '_P'), how='left').drop(columns=['Month'])
-    merged_df = merged_df.set_index(C.DATE)
+        merged_df.drop(columns=[C.TX_TYPE + '_P'], inplace=True)
 
-    return merged_df
+        # for col in current_cols:
+        #     # print(col)
+        #     merged_df[col + C.YOY] = ((merged_df[col] - merged_df[col + '_P']) /
+        #                               merged_df[col + '_P'] * 100)
 
+        merged_df[C.TOTAL_PROFIT] = merged_df[C.INST_DAYS] + merged_df[C.CAPITAL_GAINS]
+        merged_df[C.TOTAL_PROFIT + '_P'] = merged_df[C.INST_DAYS + '_P'] + merged_df[C.CAPITAL_GAINS + '_P']
 
-def security_monthly_report(year_num: int, txn_type: Type[SecurityTx]) -> pd.DataFrame:
-    """
-    生成固收交易的月度报告。
+        mask = merged_df[C.TOTAL_PROFIT + '_P'] != 0
+        merged_df[C.TOTAL_PROFIT + C.YOY] = 0.0
+        merged_df.loc[mask, C.TOTAL_PROFIT + C.YOY] = ((merged_df.loc[mask, C.TOTAL_PROFIT] -
+                                                        merged_df.loc[mask, C.TOTAL_PROFIT + '_P']) /
+                                                       merged_df.loc[mask, C.TOTAL_PROFIT + '_P'] * 100)
 
-    该函数根据指定的年份、交易类型创建一个交易对象，生成该年各月的统计情况。
+        merged_df[C.WEIGHT_RATE + '_SUB'] = (merged_df[C.WEIGHT_RATE] - merged_df[C.WEIGHT_RATE + '_P']) * 100
 
-    Args:
-        year_num (int): 报告生成的年份。
-        txn_type (Type[SecurityTx]): 资金交易的类型。
+        self.tx_data_dict[tx_type] = merged_df
 
-    Returns:
-        pd.DataFrame: 包含月度汇总报告的 DataFrame，列包括:
-                      [C.DATE, C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]，收益率是不含净价浮盈的
-    """
-    months = TimeUtil.get_months_feday(year_num)
-    # print(months)
-    start_time = months[0][0]
-    end_time = months[-1][1]
+        return merged_df
 
-    txn_data = SecurityDataHandler(txn_type(start_time, end_time)).get_monthly_summary()
+    def asset_debt_data(self) -> pd.DataFrame:
+        """
+        生成资产负债的收入或支出数据
+        :return: [C.TX_TPYE, C.TOTAL_PROFIT]
+        """
 
-    return txn_data
+        tx_types = [C.REPL, C.IBL, C.BOND, C.CD, C.REPO, C.IBO]
+
+        data = pd.DataFrame(columns=[C.TX_TYPE, C.TOTAL_PROFIT])
+
+        for tx_type in tx_types:
+
+            new_row = pd.DataFrame({C.TX_TYPE: [tx_type], C.TOTAL_PROFIT: [0.0]})
+
+            if self.tx_data_dict[tx_type].empty:
+                if tx_type in [C.REPL, C.IBL, C.REPO, C.IBO]:
+                    self.fund_monthly_report_yoy(tx_type)
+                elif tx_type in [C.BOND, C.CD]:
+                    self.security_monthly_report_yoy(tx_type)
+                else:
+                    raise ValueError('Unknown tx_type')
+
+            if tx_type in [C.REPL, C.IBL, C.REPO, C.IBO]:
+                new_row[C.TOTAL_PROFIT] = self.tx_data_dict[tx_type][C.INST_DAYS].sum()
+            elif tx_type in [C.BOND, C.CD]:
+                new_row[C.TOTAL_PROFIT] = self.tx_data_dict[tx_type][C.TOTAL_PROFIT].sum()
+            else:
+                raise ValueError('Unknown tx_type')
+
+            if data.empty:
+                data = new_row
+            else:
+                data = pd.concat([data, new_row], ignore_index=True)
+
+        return data
 
 
 if __name__ == '__main__':
     # dh = fundtx_monthly_report(2023, IBO, '同业拆入', 2)
     # dh = security_monthly_report(2023, BondTx)
     # dh = fundtx_monthly_report(2023, Repo, '正回购', 1.8)
+
     print('xx')

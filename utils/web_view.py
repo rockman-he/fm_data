@@ -234,27 +234,26 @@ def pie_global(df: pd.DataFrame, xaxis: str, yaxis: str, title: str):
     return pie
 
 
-def main_fundtx_chart(df: pd.DataFrame, yaxis1_name, yaxis2_name, yaxis3_name):
+def main_page_by_type(df: pd.DataFrame, title, y1_name, y1_column, y2_name, y2_column, y3_name, y3_column):
     month_list = df.index.month.astype(str) + '月'
     month_list = month_list.tolist()
 
     bar = (
         Bar()
-        # .add_xaxis(df.index.dt.strftime('%Y-%m-%d').values.tolist())
         .add_xaxis(month_list)
-        .add_yaxis(series_name=yaxis1_name,
+        .add_yaxis(series_name=y1_name,
                    # 相同组间的柱体间距
                    gap=0,
                    # 不同组间的柱体间距
                    category_gap="50%",
-                   y_axis=(df[C.AVG_AMT] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
+                   y_axis=(df[y1_column] / 100000000).apply(lambda x: '%.2f' % x).values.tolist(),
                    markpoint_opts=opts.MarkPointOpts(
                        data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
                        label_opts=(LabelOpts(font_size=9))),
                    # 控制透明度
                    itemstyle_opts=opts.ItemStyleOpts(color="rgba(16, 78, 139, 0.8)"))
-        .add_yaxis(series_name=yaxis2_name,
-                   y_axis=(df[C.INST_DAYS] / 10000).apply(lambda x: '%.2f' % x).values.tolist(),
+        .add_yaxis(series_name=y2_name,
+                   y_axis=(df[y2_column] / 10000).apply(lambda x: '%.2f' % x).values.tolist(),
                    yaxis_index=1,
                    gap=0,
                    category_gap="50%",
@@ -263,32 +262,61 @@ def main_fundtx_chart(df: pd.DataFrame, yaxis1_name, yaxis2_name, yaxis3_name):
                        label_opts=(LabelOpts(font_size=9))),
                    itemstyle_opts=opts.ItemStyleOpts(color="rgba(238, 173, 14, 0.8)"))
         .extend_axis(
+            # index 1
             yaxis=opts.AxisOpts(
                 name='',
                 position="right",
                 axislabel_opts=opts.LabelOpts(formatter="{value}"),
-                max_='{:.2f}'.format(df[C.INST_DAYS].max() / 10000 * 3),
+                max_='{:.2f}'.format(df[y2_column].max() / 10000 * 3),
+                # min_='{:.2f}'.format(df[y2_column + C.YOY].min() * 1.2),
+                # min_=-100,
                 axisline_opts=opts.AxisLineOpts(
-                    linestyle_opts=opts.LineStyleOpts(color="#eead0e")
+                    linestyle_opts=opts.LineStyleOpts(color="#eead0e"),
+                    # is_on_zero=True,
+                    # on_zero_axis_index=0
                 ),
                 # 去掉该坐标系的间隔线
                 splitline_opts=opts.SplitLineOpts(is_show=False),
             ),
         )
         .extend_axis(
+            # index 2
             yaxis=opts.AxisOpts(
                 name="",
                 type_="value",
-                min_=0,
-                max_='{:.2f}'.format(df[C.WEIGHT_RATE].max() * 1.2),
-                interval=2,
+                # min_='{:.2f}'.format(df[y2_column + C.YOY].min() * 1.2),
+                max_='{:.2f}'.format(df[y3_column].max() * 1.2),
+                # min_=-0.05,
+                interval=0.5,
                 # 和其他y坐标轴的间距
                 offset=70,
                 axislabel_opts=opts.LabelOpts(formatter="{value} %"),
                 axisline_opts=opts.AxisLineOpts(
-                    linestyle_opts=opts.LineStyleOpts(color="red")
+                    linestyle_opts=opts.LineStyleOpts(color="red"),
+                    # is_on_zero=True,
+                    # on_zero_axis_index=0
                 ),
                 splitline_opts=opts.SplitLineOpts(is_show=False),
+                is_show=False
+            ),
+        )
+        .extend_axis(
+            # index 3
+            yaxis=opts.AxisOpts(
+                name="",
+                type_="value",
+                # min_='{:.2f}'.format(df[y2_column + C.YOY].min() * 1.2),
+                # max_='{:.2f}'.format(df[y2_column + C.YOY].max() * 1.2),
+                # 和其他y坐标轴的间距
+                # offset=150,
+                axislabel_opts=opts.LabelOpts(formatter="{value} %"),
+                axisline_opts=opts.AxisLineOpts(
+                    linestyle_opts=opts.LineStyleOpts(color="red"),
+                    # is_on_zero=True,
+                    # on_zero_axis_index=3
+                ),
+                splitline_opts=opts.SplitLineOpts(is_show=False),
+                is_show=False
             ),
         )
         .set_series_opts(areastyle_opts=opts.AreaStyleOpts(opacity=0.5),
@@ -300,14 +328,21 @@ def main_fundtx_chart(df: pd.DataFrame, yaxis1_name, yaxis2_name, yaxis3_name):
             tooltip_opts=opts.TooltipOpts(
                 is_show=True, trigger="axis", axis_pointer_type="cross"
             ),
-            xaxis_opts=opts.AxisOpts(axislabel_opts=opts.LabelOpts(rotate=-20)),
+            xaxis_opts=opts.AxisOpts(axislabel_opts=opts.LabelOpts(rotate=0),
+                                     axisline_opts=opts.AxisLineOpts(is_on_zero=True, on_zero_axis_index=0)),
             yaxis_opts=opts.AxisOpts(
-                max_='{:.2f}'.format(df[C.AVG_AMT].max() / 100000000 * 1.3),
+                max_='{:.2f}'.format(df[y1_column].max() / 100000000 * 1.3),
+                # min_='{:.2f}'.format(df[y2_column + C.YOY].min() * 1.2),
+                # min_=-100,
                 splitline_opts=opts.SplitLineOpts(is_show=False),
                 axisline_opts=opts.AxisLineOpts(
-                    linestyle_opts=opts.LineStyleOpts(color="#104e8b")
+                    linestyle_opts=opts.LineStyleOpts(color="#104e8b"),
+                    # is_on_zero=True,
+                    # on_zero_axis_index=0
                 ),
-            )
+            ),
+            title_opts=opts.TitleOpts(title=title),
+
         )
     )
 
@@ -316,16 +351,76 @@ def main_fundtx_chart(df: pd.DataFrame, yaxis1_name, yaxis2_name, yaxis3_name):
         # .add_xaxis(xaxis_data=df[C.DATE].dt.strftime('%Y-%m-%d').values.tolist())
         .add_xaxis(month_list)
         .add_yaxis(
-            series_name=yaxis3_name,
+            series_name=(y2_name[:-3] + '同比,%)'),
+            # y_axis=(df[y2_column + C.YOY]).values.tolist(),
+            y_axis=df[y2_column + C.YOY].apply(lambda x: '%.2f' % x).values.tolist(),
+            yaxis_index=3,
+            label_opts=opts.LabelOpts(is_show=False),
+            color='lightseagreen',
+            markpoint_opts=opts.MarkPointOpts(
+                data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
+                label_opts=(LabelOpts(font_size=9))),
+            linestyle_opts=opts.LineStyleOpts(type_="dashed"),
+        )
+        .add_yaxis(
+            series_name=y3_name,
             yaxis_index=2,
-            y_axis=df[C.WEIGHT_RATE].apply(lambda x: '%.2f' % x).values.tolist(),
+            y_axis=df[y3_column].apply(lambda x: '%.2f' % x).values.tolist(),
             label_opts=opts.LabelOpts(is_show=False),
             color='rgba(255, 48, 48, 0.8)',
             markpoint_opts=opts.MarkPointOpts(
                 data=[opts.MarkPointItem(type_="max"), opts.MarkPointItem(type_="min")],
                 label_opts=(LabelOpts(font_size=9))),
-            is_smooth=True
+            is_smooth=True,
         )
+
     )
 
     return bar.overlap(line)
+
+
+def main_page_all_profit(df: pd.DataFrame):
+    asset_types = [C.REPL, C.IBL, C.BOND, C.CD]
+    debt_types = [C.REPO, C.IBO]
+
+    asset_df = df.loc[df[C.TX_TYPE].isin(asset_types)]
+    asset_df.loc[asset_df[C.TX_TYPE] == C.REPL, C.TX_TYPE] = '回购业务'
+    asset_df.loc[asset_df[C.TX_TYPE] == C.IBL, C.TX_TYPE] = '拆借业务'
+    asset_df.loc[asset_df[C.TX_TYPE] == C.BOND, C.TX_TYPE] = '债券业务'
+    asset_df.loc[asset_df[C.TX_TYPE] == C.CD, C.TX_TYPE] = '存单业务'
+
+    debt_df = df.loc[df[C.TX_TYPE].isin(debt_types)]
+    debt_df.loc[debt_df[C.TX_TYPE] == C.REPO, C.TX_TYPE] = '回购业务'
+    debt_df.loc[debt_df[C.TX_TYPE] == C.IBO, C.TX_TYPE] = '拆借业务'
+
+    c = (
+        Pie()
+        .add(
+            "资产类业务",
+            [list(z) for z in zip(asset_df[C.TX_TYPE].tolist(),
+                                  (asset_df[C.TOTAL_PROFIT] / 10000).apply(lambda x: round(x, 2)).tolist())],
+            center=["20%", "40%"],
+            radius=[80, 100],
+            label_opts=opts.LabelOpts(
+                formatter="{b}: {c}万元 ({d}%)",
+            ),
+        )
+        .add(
+            "负债类业务",
+            [list(z) for z in zip(debt_df[C.TX_TYPE].tolist(),
+                                  (asset_df[C.TOTAL_PROFIT] / 10000).apply(lambda x: round(x, 2)).tolist())],
+            center=["60%", "40%"],
+            radius=[80, 100],
+            label_opts=opts.LabelOpts(
+                formatter="{b}: {c}万元 ({d}%)",
+            ),
+        )
+        .set_global_opts(
+            title_opts=opts.TitleOpts(title=""),
+            legend_opts=opts.LegendOpts(
+                type_="scroll", pos_top="20%", pos_left="80%", orient="vertic"
+            ),
+        )
+    )
+
+    return c

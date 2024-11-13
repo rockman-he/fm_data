@@ -90,7 +90,7 @@ class FundTx:
         """
         获取统计区间内每日持仓的统计数据.
 
-        :param direction: 交易方向，资金融入（正回购4，同业拆入1），资金融出（逆回购1，同业拆出4），坑爹玩意儿
+        :param direction: 交易方向，资金融入4，资金融出1
 
         Returns:
             pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
@@ -402,6 +402,8 @@ class IBO(FundTx):
         # f" and ti.{C.DIRECTION} = " + self.direction + \
 
         self.raw = self._get_raw_data(sql)
+        if not self.raw.empty:
+            self.raw[C.DIRECTION] = self.raw[C.DIRECTION].replace({4: 1, 1: 4})
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
@@ -453,7 +455,7 @@ class IBO(FundTx):
         if self.raw.empty or direction not in ['同业拆入', '同业拆出']:
             return pd.DataFrame({})
 
-        d = 1 if direction == '同业拆入' else 4
+        d = 4 if direction == '同业拆入' else 1
 
         return super().daily_data(d)
 
