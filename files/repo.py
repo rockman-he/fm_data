@@ -61,7 +61,7 @@ dh = {'party': pd.DataFrame({})}
 
 if txn_submit:
     fh = FundDataHandler(TxFactory(Repo).create_txn(start_time, end_time))
-    fh.set_direction(cps_type)
+    fh.set_direction(C.REPO if cps_type == '正回购' else C.REPL)
 
     dh = fh.all_data_show()
 

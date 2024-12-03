@@ -62,7 +62,7 @@ dh = {'party': pd.DataFrame({})}
 if txn_submit:
     # txn = TxFactory(IBO).create_txn(start_time, end_time, cps_type)
     fh = FundDataHandler(TxFactory(IBO).create_txn(start_time, end_time))
-    fh.set_direction(cps_type)
+    fh.set_direction(C.IBO if cps_type == '同业拆入' else C.IBL)
 
     dh = fh.all_data_show()
 

@@ -1,5 +1,5 @@
 .idea
-.streamlit
+# .streamlit
 /test/*
 __pycache__/
 /uml
