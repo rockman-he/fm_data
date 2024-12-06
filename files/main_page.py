@@ -67,14 +67,17 @@ if txn_submit:
 
     streamlit_echarts.st_pyecharts(main_page_all_profit(df))
 
+    st.dataframe(tx.get_tx_total(C.REPO, year_num))
+    st.dataframe(tx.get_tx_total(C.REPL, year_num))
+    st.dataframe(tx.get_tx_total(C.IBO, year_num))
+    st.dataframe(tx.get_tx_total(C.IBL, year_num))
+
     st.write("###  各业务月度情况")
 
 
     # todo 补充回购及拆借业务的套息收入，业务明细
-
     @st.fragment
     def show_main_page():
-
         with st.container():
             tx_type = st.radio(" ", ["债券业务", "同业存单", "回购业务", "拆借业务"], index=0,
                                horizontal=True)
@@ -91,6 +94,7 @@ if txn_submit:
                 streamlit_echarts.st_pyecharts(main_page_by_type(repl, '逆回购', '日均余额（亿元）', C.AVG_AMT,
                                                                  '利息收入（万元）', C.INST_DAYS, '加权利率（%）',
                                                                  C.WEIGHT_RATE), height='500px')
+
             if tx_type == '拆借业务':
                 streamlit_echarts.st_pyecharts(main_page_by_type(ibo, '同业拆入', '日均余额（亿元）', C.AVG_AMT,
                                                                  '利息支出（万元）', C.INST_DAYS, '加权利率（%）',
@@ -107,3 +111,10 @@ if txn_submit:
 
 
     show_main_page()
+
+    st.dataframe(repo)
+    st.dataframe(repl)
+    st.dataframe(ibo)
+    st.dataframe(ibl)
+    st.dataframe(bond)
+    st.dataframe(cd)

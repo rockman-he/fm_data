@@ -69,7 +69,7 @@ if option == '收益测算':
         st.write("### 区间收益")
         st.markdown("###### ")
 
-        daily_cum = dh.period_yield_all_cum(start_time, end_time)
+        daily_cum = dh.daily_yield_all_cum(start_time, end_time)
         st.write(f"**日均存单持仓**: {daily_cum[C.HOLD_AMT].sum() / len(daily_cum):,.2f} 元")
         st.write(f"**日均资金占用**: {daily_cum[C.CAPITAL_OCCUPY].sum() / len(daily_cum):,.2f} 元")
         st.write(f"**利息收入**: {daily_cum[C.INST_A_DAY].sum():,.2f} 元")

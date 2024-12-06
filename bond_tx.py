@@ -57,7 +57,7 @@ class SecurityTx:
         self.conn = create_conn()
 
         self.secondary_trades = self._sum_secondary_trades()
-        self.holded_bonds_info = self._holded_bonds_info()
+        self.holded_bonds_info = self._holded_bonds_info_expand()
 
         bond_type = pd.DataFrame({})
         if not self.holded_bonds_info.empty:
@@ -110,10 +110,10 @@ class SecurityTx:
 
         return raw
 
-    def _holded_bonds_info(self) -> pd.DataFrame:
+    def _holded_bonds_info_expand(self, days: int = 7) -> pd.DataFrame:
 
         """
-        交易期间持有的债券信息，不包括早期的收益凭证。
+        时间区间持有过的债券信息，不包括早期的收益凭证。在统计区间上默认前后扩充7天
         Returns:
             pd.DataFrame: [C.BOND_NAME, C.BOND_FULL_NAME, C.BOND_CODE, C.BOND_TYPE_NUM, C.BOND_TYPE, C.ISSUE_DATE},
             C.MATURITY, C.COUPON_RATE_CURRENT, C.COUPON_RATE_ISSUE, C.ISSUE_AMT, C.ISSUE_PRICE, C.ISSUE_ORG,
@@ -143,9 +143,9 @@ class SecurityTx:
               f"left join {C.COMP_DBNAME}.basic_bondbasicinfos bi " \
               f"on cc.{C.BOND_CODE} = bi.{C.BOND_CODE} " \
               f"where date(cc.{C.CARRY_DATE}) >= '" + \
-              self.start_time.strftime('%Y-%m-%d') + \
+              (self.start_time - datetime.timedelta(days=days)).strftime('%Y-%m-%d') + \
               f"' and date(cc.{C.CARRY_DATE}) <= '" + \
-              self.end_time.strftime('%Y-%m-%d') + \
+              (self.end_time + datetime.timedelta(days=days)).strftime('%Y-%m-%d') + \
               f"' and cc.{C.CARRY_TYPE} = 3; "
 
         raw = self._get_raw_data(sql)
@@ -165,30 +165,24 @@ class SecurityTx:
 
         return raw.loc[~mask, :]
 
-    # def get_holded_bonds_info(self) -> pd.DataFrame:
-    #     return self.holded_bonds_info
-
-    # def get_holded_bonds(self) -> pd.DataFrame:
-    #     return self.holded
-
+    # def _holded_bonds_info(self) -> pd.DataFrame:
     #
-    # def get_holding_bonds_endtime(self) -> pd.DataFrame:
-    #     return self.holded[self.holded[C.DATE].dt.date == self.end_time]
-
-    # def get_primary_trades(self) -> pd.DataFrame:
-    #     return self.primary_trades
-
-    # def get_secondary_trades(self) -> pd.DataFrame:
-    #     return self.secondary_trades
-
-    # def get_inst_cash_flow_all(self) -> pd.DataFrame:
-    #     return self.insts_flow_all
-
-    # def get_daily_value_all(self) -> pd.DataFrame:
-    #     return self.value
-
-    # def get_capital_all(self) -> pd.DataFrame:
-    #     return self.capital
+    #     """
+    #     时间区间持有过的债券信息，不包括早期的收益凭证。
+    #     Returns:
+    #         pd.DataFrame: [C.BOND_NAME, C.BOND_FULL_NAME, C.BOND_CODE, C.BOND_TYPE_NUM, C.BOND_TYPE, C.ISSUE_DATE},
+    #         C.MATURITY, C.COUPON_RATE_CURRENT, C.COUPON_RATE_ISSUE, C.ISSUE_AMT, C.ISSUE_PRICE, C.ISSUE_ORG,
+    #         C.BOND_TERM, C.MARKET_CODE]
+    #
+    #     """
+    #
+    #     if self.holded_bonds_info.empty:
+    #         return pd.DataFrame({})
+    #
+    #
+    #     mask = (self.holded_bonds_info[C.ISSUE_DATE] <= self.end_time) & \
+    #
+    #     return self.holded_bonds_info.loc[mask, ]
 
     # 1.1 全量利息现金流获取
     def _inst_cash_flow_all(self) -> pd.DataFrame:
@@ -230,7 +224,7 @@ class SecurityTx:
     def get_inst_flow(self, bond_code: str) -> pd.DataFrame:
 
         """
-        某支债券的利息现金流
+        持仓区间内的某支债券的每百元利息现金流
 
         Parameters
         ----------
@@ -247,6 +241,7 @@ class SecurityTx:
         if self.insts_flow_all.empty or (bond_code not in self.insts_flow_all[C.BOND_CODE].tolist()):
             return pd.DataFrame({})
 
+        # 取该债券的数据子集
         bond = self.insts_flow_all.loc[self.insts_flow_all[C.BOND_CODE] == bond_code]
 
         # 初始化
@@ -260,10 +255,10 @@ class SecurityTx:
 
         # Calculate the daily cash flow for each date
         for row in bond.index:
-            date_range = pd.date_range(start=bond.loc[row][C.INST_START_DATE],
-                                       end=bond.loc[row][C.INST_END_DATE] - datetime.timedelta(days=1),
+            date_range = pd.date_range(start=bond.loc[row, C.INST_START_DATE],
+                                       end=bond.loc[row, C.INST_END_DATE] - datetime.timedelta(days=1),
                                        freq='D')
-            inst_a_day = bond.loc[row][C.PERIOD_INST] / bond.loc[row][C.ACCRUAL_DAYS]
+            inst_a_day = bond.loc[row, C.PERIOD_INST] / bond.loc[row, C.ACCRUAL_DAYS]
 
             # 由于计息天数等因素的差异，根据利息现金流分时间段赋值
             inst_daily.loc[inst_daily[C.DATE].isin(date_range), C.INST_A_DAY] = inst_a_day
@@ -326,33 +321,35 @@ class SecurityTx:
                 (bond_code not in self.holded_bonds_info[C.BOND_CODE].tolist())):
             return pd.DataFrame({})
 
-        value_daily = pd.DataFrame(columns=[C.DATE])
-        value_daily[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code, C.DATE]
+        # 把持仓时间段作为列取出赋值
+        bond_value = pd.DataFrame(columns=[C.DATE])
+        # C.DATE仅为持仓时间段
+        bond_value[C.DATE] = self.holded.loc[self.holded[C.BOND_CODE] == bond_code, C.DATE]
 
         # 如果数据库中没有估值，则默认为100
         if self.value.empty or (bond_code not in self.value[C.BOND_CODE].tolist()):
-            value_daily[C.VALUE_NET_PRICE] = 100
-            return value_daily
+            bond_value[C.VALUE_NET_PRICE] = 100
+            return bond_value
 
         bond = self.value.loc[self.value[C.BOND_CODE] == bond_code]
         bond = bond.drop_duplicates(C.DATE)
 
         # 非工作日数据缺失，取前一个工作日的估值
-        # todo 如果中间有缺失，估值100会造成收益率曲线波动，取最后一个非空值是否更好
         bond = bond.set_index(C.DATE).resample('D').asfreq().reset_index()
         bond.ffill(inplace=True)
 
-        value_daily = pd.merge(value_daily, bond[[C.DATE, C.VALUE_NET_PRICE]], on=C.DATE, how='left')
+        bond_value = pd.merge(bond_value, bond[[C.DATE, C.VALUE_NET_PRICE]], on=C.DATE, how='left')
 
         # 如果数据库中没有估值，则默认为100；但如果中间有缺失，估值100会造成收益率曲线波动
-        value_daily.fillna(100, inplace=True)
+        bond_value.fillna(100, inplace=True)
 
-        return value_daily
+        return bond_value
 
     def _daily_holded_all(self) -> pd.DataFrame:
 
         """
-        查询每日持仓数据，日期范围在两端各延长 60 天，不含委托投资
+        查询每日持仓数据，日期范围在两端各延长 15 天，不含委托投资；延长的原因为在计算资本利得时，需要去到交易前一天的成本净价，增加可
+        查询范围
 
         Returns
         -------
@@ -374,9 +371,9 @@ class SecurityTx:
               f"cc.{C.COST_NET_PRICE} " \
               f"from {C.COMP_DBNAME}.core_carrybondholds cc " \
               f"where date(cc.{C.CARRY_DATE}) >= '" + \
-              (self.start_time - datetime.timedelta(days=10)).strftime('%Y-%m-%d') + \
+              (self.start_time - datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
               f"' and date(cc.{C.CARRY_DATE}) <= '" + \
-              (self.end_time + datetime.timedelta(days=10)).strftime('%Y-%m-%d') + \
+              (self.end_time + datetime.timedelta(days=15)).strftime('%Y-%m-%d') + \
               f"' and cc.{C.CARRY_TYPE} = 3 " \
               f"and cc.{C.PORTFOLIO_NO} not in ('Portfolio-20170919-008', 'Portfolio-20170713-023') " \
               f"order by cc.{C.CARRY_DATE};"
@@ -565,20 +562,35 @@ class SecurityTx:
                 C.COST_NET_PRICE, C.CAPITAL_GAINS]
         """
 
+        # 没有二级交易，则无资本利得
         if self.start_time > self.end_time or self.secondary_trades.empty:
             return pd.DataFrame({})
 
         # 只有卖出债券才有资本利得
         mask = (self.secondary_trades[C.DIRECTION] == 4)
-        raw = self.secondary_trades.loc[mask, [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT]]
+        sell_data = self.secondary_trades.loc[mask, [C.DATE, C.BOND_CODE, C.BOND_NAME, C.BOND_AMT_CASH, C.TRADE_AMT]]
 
-        if raw.empty:
+        if sell_data.empty:
             return pd.DataFrame({})
 
-        raw_group = raw.groupby([C.DATE, C.BOND_CODE, C.BOND_NAME]).agg({
+        # 由于单日可能有多笔交易，则按照日期、债券代码、债券名称分组
+        raw_group = sell_data.groupby([C.DATE, C.BOND_CODE, C.BOND_NAME]).agg({
             C.BOND_AMT_CASH: lambda x: x.sum(),
             C.TRADE_AMT: lambda x: x.sum(),
         })
+
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     bond_info = self.holded.drop_duplicates(subset=[C.BOND_CODE, C.BOND_NAME]).loc[:,
+        #                 [C.BOND_CODE, C.MARKET_CODE]]
+        #     print(bond_info)
+
+        # 完善基础信息C.MARKET_CODE
+        bond_info = self.holded.drop_duplicates(subset=[C.BOND_CODE, C.BOND_NAME]).loc[:, [C.BOND_CODE, C.MARKET_CODE]]
+        raw_group = raw_group.reset_index(drop=False)
+        raw_group = pd.merge(raw_group, bond_info, on=C.BOND_CODE, how='left')
+
+        # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        #     print(raw_group)
 
         # 当日的交易加权净价
         raw_group[C.WEIGHT_NET_PRICE] = raw_group[C.TRADE_AMT] / raw_group[C.BOND_AMT_CASH] * 100
@@ -586,17 +598,16 @@ class SecurityTx:
         # Create a copy of self.holded to avoid modifying the original DataFrame
         holded_copy = self.holded.copy()
 
-        # 3.2 从C.DATE列加一天，获取前一天的成本净价
-        # add one day from the C.DATE column，get previous day's net cost price
+        # 3.2 C.DATE列加一天，这样按C.DATE合并时，取得前一天的成本净价；
         holded_copy[C.DATE] = holded_copy[C.DATE] + pd.Timedelta(days=1)
-
-        # Merge raw_group with the modified holded_copy
         raw_group = pd.merge(raw_group,
-                             holded_copy[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
+                             holded_copy[[C.DATE, C.BOND_CODE, C.BOND_NAME, C.COST_NET_PRICE]],
                              on=[C.DATE, C.BOND_CODE, C.BOND_NAME], how='left')
 
-        # 3.3 理论上前一天的成本净价没有空值，但是源数据库数据有问题(20161219,160010)，暂时做此处理
-        raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
+        # 3.3 理论上前一天的成本净价没有空值，但是源数据库数据有问题(如20161219,160010)，缺失的话向前取值，如果之前均为none，则取100
+        # raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
+        raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].ffill().fillna(100)
+        # raw_group[C.COST_NET_PRICE] = raw_group[C.COST_NET_PRICE].fillna(100)
         raw_group[C.CAPITAL_GAINS] = ((raw_group[C.WEIGHT_NET_PRICE] - raw_group[C.COST_NET_PRICE])
                                       * raw_group[C.BOND_AMT_CASH] / 100)
 
@@ -630,7 +641,7 @@ class SecurityTx:
 
         inst = _self.get_inst_flow(bond_code)
 
-        # 按照数据库设计的逻辑，当到期日的第二天为非工作日时，无利息流，但是仍然有持仓和资金占用
+        # 有持仓但是无利息现金流的情况：按照数据库设计的逻辑，当到期日的第二天为非工作日时，无利息流，但是仍然有持仓和资金占用
         if inst.empty:
             inst = pd.DataFrame(columns=[C.DATE, C.INST_A_DAY])
             inst[C.DATE] = raw[C.DATE]
@@ -672,10 +683,10 @@ class SecurityTx:
         return capital
 
     # 4.3 计算单只债券的净价浮盈
-    def get_net_profit(_self, bond_code: str) -> pd.DataFrame:
+    def get_daily_net_profit(_self, bond_code: str) -> pd.DataFrame:
 
         """
-        单支债券的净价浮盈
+        区间内持仓单支债券的净价浮盈
 
         Parameters
         ----------
@@ -721,21 +732,33 @@ class SecurityTx:
             C.BOND_TYPE, C.CAPITAL_GAINS, C.INST_A_DAY,C.VALUE_NET_PRICE, C.NET_PROFIT, C.TOTAL_PROFIT,C.CAPITAL_OCCUPY]
         """
 
-        if (self.start_time > self.end_time or self.holded_bonds_info.empty or
-                bond_code not in self.holded_bonds_info[C.BOND_CODE].tolist()):
+        # if (self.start_time > self.end_time or self.holded_bonds_info.empty or
+        #         bond_code not in self.holded_bonds_info[C.BOND_CODE].tolist()):
+        #     return pd.DataFrame({})
+
+        if self.start_time > self.end_time:
             return pd.DataFrame({})
 
         # 如果有该债券的持仓，这两项一定不会是空值
         daily_insts = self.get_daily_insts(bond_code)
-        net_profit = self.get_net_profit(bond_code)
-
+        net_profit = self.get_daily_net_profit(bond_code)
         bond = self.daily_holded_bond(bond_code).copy()
-
         capital = self.get_capital_gains(bond_code)
 
-        # merge capital gains first
+        # 该情况为单日卖空无持仓但存在资本利得的情况
+        if bond.empty and (not capital.empty):
+            capital = capital.copy()
+            # 无持仓的情况下，增加列，以保持格式一致
+            capital[[C.HOLD_AMT, C.COST_FULL_PRICE, C.INST_A_DAY, C.VALUE_NET_PRICE, C.NET_PROFIT,
+                     C.CAPITAL_OCCUPY]] = 0.0
+            capital[C.TOTAL_PROFIT] = capital[C.CAPITAL_GAINS]
+
+            # capital = pd.merge(capital, self.secondary_trades[C.BOND_COD], on=C.DATE, how='left')
+            return capital
+
+        # 对于无资本利得的情况，直接赋值0
         if capital.empty:
-            bond[C.CAPITAL_GAINS] = 0.0
+            bond.loc[:, C.CAPITAL_GAINS] = 0.0
         else:
             # 如果当日卖空,则持仓为0
             bond = pd.merge(bond, capital[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.CAPITAL_GAINS]],
@@ -763,9 +786,9 @@ class SecurityTx:
 
         return bond.loc[mask, :]
 
-    def get_all_profit_data(self):
+    def get_all_daily_profit(self):
         """
-        汇总所有债券的总收益
+        汇总区间内每天所有债券的总收益
         :return:
             [C.DATE, C.BOND_NAME, C.BOND_CODE, C.MARKET_CODE, C.HOLD_AMT, C.COST_FULL_PRICE, C.COST_NET_PRICE,
             C.BOND_TYPE, C.CAPITAL_GAINS, C.INST_A_DAY,C.VALUE_NET_PRICE, C.NET_PROFIT, C.TOTAL_PROFIT,C.CAPITAL_OCCUPY

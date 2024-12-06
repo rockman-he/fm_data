@@ -9,7 +9,7 @@ test_page = st.Page("files/test_page.py", title="测试页面", icon=":material/
 
 pg = st.navigation(
     {
-        "业务概况": [main_page, repo_page, ibo_page, cd_page, bond_page, test_page],
+        "主页": [main_page, repo_page, ibo_page, cd_page, bond_page, test_page],
     }
 )
 pg.run()

@@ -27,6 +27,7 @@ class MarketUtil:
         self.start_time = None
         self.end_time = None
         self.raw = pd.DataFrame({})
+        self.conn = create_conn()
 
     def get_irt(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
 
@@ -47,28 +48,48 @@ class MarketUtil:
         if self.start_time > self.end_time:
             return pd.DataFrame({})
 
-        if self.raw.empty is False:
+        if not self.raw.empty:
             return self.raw
 
         sql = "select * from fm_da.market_irt mi"
 
-        self.raw = get_raw(create_conn(), sql)
-        # Fill in any missing dates in the DataFrame
+        self.raw = get_raw(self.conn, sql)
+
+        full_range = pd.date_range(start=start_time, end=end_time)
+
         self.raw = self.raw.set_index(C.DATE).resample('D').asfreq().reset_index()
-        # Forward fill to fill in any missing values
         self.raw.ffill(inplace=True)
+
+        market = self.raw.set_index(C.DATE).reindex(full_range)
+        market.index.name = C.DATE
+
+        last_valid_index = market[C.SHIBOR_ON].last_valid_index()
+
+        if last_valid_index is None:
+            market[:] = 0.0
+        elif last_valid_index < market.index[-1]:
+            mask = last_valid_index + pd.Timedelta(days=1)
+            market.loc[mask:] = 0.0
+
+        market = market.ffill()
+
+        # # Fill in any missing dates in the DataFrame
+        # self.raw = self.raw.set_index(C.DATE).resample('D').asfreq().reset_index()
+        # # Forward fill to fill in any missing values
+        # self.raw.ffill(inplace=True)
         # Filter the DataFrame to only include rows within the given time period
-        mask = (self.raw[C.DATE] >= pd.to_datetime(self.start_time)) & (
-                self.raw[C.DATE] <= pd.to_datetime(self.end_time))
 
-        # print(self.raw.loc[mask])
+        market = market.reset_index()
 
-        return self.raw.loc[mask]
+        mask = (market[C.DATE] >= pd.to_datetime(self.start_time)) & (
+                market[C.DATE] <= pd.to_datetime(self.end_time))
+
+        return market.loc[mask]
 
 
 if __name__ == '__main__':
     # Test the MarketUtil class
     market = MarketUtil()
-    start_time = datetime(2023, 1, 1)
-    end_time = datetime(2023, 6, 1)
+    start_time = datetime(2024, 6, 1)
+    end_time = datetime(2024, 6, 1)
     print(market.get_irt(start_time, end_time))

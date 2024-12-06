@@ -51,8 +51,3 @@ if __name__ == "__main__":
     ibo = TxFactory(IBO).create_txn(s_t, e_t)
 
     bond = TxFactory(BondTx).create_txn(s_t, e_t)
-    # bond.daily_data_by_direction('逆回购')
-
-    print(repo.daily_data_by_direction('逆回购'))
-    # print(bond.daily_data_by_direction('同业拆入'))
-    print(bond.get_net_profit('112303195.IB'))

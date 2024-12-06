@@ -3,7 +3,6 @@
 # FileName: transaction
 # Description: This module contains classes for handling transactions.
 import datetime
-
 import pandas as pd
 
 from utils.db_util import Constants as C, create_conn, get_raw
@@ -22,7 +21,7 @@ class FundTx:
 
     def __init__(self, start_time: datetime.date, end_time: datetime.date) -> None:
         """
-        FundTx的构造函数.
+        FundTx的构造函数，计息基数为365
 
         Args:
             start_time (datetime.date): 交易的开始时间.
@@ -33,6 +32,7 @@ class FundTx:
         # self.direction = direction
         self.inst_base = 365
         self.raw = None
+        self.conn = create_conn()
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
@@ -50,7 +50,7 @@ class FundTx:
             return pd.DataFrame({})
 
         # 从数据库中获取数据
-        raw = get_raw(create_conn(), sql)
+        raw = get_raw(self.conn, sql)
 
         if raw.empty:
             return pd.DataFrame({})
@@ -134,71 +134,6 @@ class FundTx:
 
         return daily
 
-    # 交易对手排名
-    # def party_rank(self) -> pd.DataFrame:
-    #     """
-    #     按照主机构的日均余额进行排名，返回统计数据.
-    #
-    #     Returns:
-    #         pd.DataFrame: [C.NAME, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
-    #     """
-    #
-    #     if self.raw.empty:
-    #         return pd.DataFrame({})
-    #
-    #     party = self._groupby_column(C.NAME)
-    #
-    #     # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    #     #     print(repo_rank)
-    #
-    #     return party
-
-    # def term_rank(self) -> pd.DataFrame:
-    #     """
-    #     按照各期限的日均余额进行排名，返回统计数据.
-    #
-    #     Returns:
-    #         pd.DataFrame: [C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
-    #     """
-    #
-    #     if self.raw.empty:
-    #         return pd.DataFrame({})
-    #
-    #     term = self._groupby_column(C.TERM_TYPE)
-    #
-    #     # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    #     #     print(term)
-    #
-    #     return term
-
-    # def head_stats(self) -> Dict:
-    #     """
-    #     统计交易数据，用于在repo.py的题头显示.
-    #
-    #     Returns:
-    #         Dict: {C.TRADE_NUM, C.TRADE_SUM, C.TRADE_WEIGHT_SUM, C.MAX_RATE, C.MIN_RATE}
-    #     """
-    #
-    #     if self.raw.empty:
-    #         return {}
-    #
-    #     mask = ((self.raw[C.SETTLEMENT_DATE] >= self.start_time.strftime('%Y-%m-%d')) &
-    #             (self.raw[C.SETTLEMENT_DATE] <= self.end_time.strftime('%Y-%m-%d')))
-    #     occ_stats = self.raw[mask]
-    #
-    #     return {
-    #         # 交易笔数
-    #         C.TRADE_NUM: occ_stats.shape[0],
-    #         # 交易总额（按发生）
-    #         C.TRADE_SUM: occ_stats[C.TRADE_AMT].sum(),
-    #         # 交易金额（按加权）
-    #         C.TRADE_WEIGHT_SUM: self.raw[C.TRADE_AMT].sum(),
-    #         # 单笔利率(最大）
-    #         C.MAX_RATE: occ_stats[C.RATE].max(),
-    #         # 单笔利率(最小）
-    #         C.MIN_RATE: occ_stats[C.RATE].min()
-    #     }
-
     def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
 
         """
@@ -235,7 +170,7 @@ class FundTx:
 
         Args:
             column (str): 被聚合的列.
-            direction(int): 交易方向，资金融入（正回购4，同业拆入1），资金融出（逆回购1，同业拆出4）
+            direction(int): 交易方向，资金融入4，资金融出1
 
         Returns:
             pd.DataFrame: [column, C.AVG_AMT, C.INST_GROUP, C.PRODUCT, C.WEIGHT_RATE].
@@ -243,20 +178,20 @@ class FundTx:
 
         raw = self.raw_by_direction(direction)
 
-        # 按期限类型进行分组
+        # 按列进行分组
         txn_group = raw.groupby(raw[column])
         # 利息加总
         inst_group = txn_group[C.INST_DAYS].agg("sum")
         # 积数加总
-        product = txn_group[C.PRODUCT].agg("sum")
+        product_group = txn_group[C.PRODUCT].agg("sum")
         # 加权利率
-        weight_rate = inst_group * self.inst_base / product * 100
+        weight_rate = inst_group * self.inst_base / product_group * 100
         # 计算日均余额
-        avg_amt = product / ((self.end_time - self.start_time).days + 1)
+        avg_amt = product_group / ((self.end_time - self.start_time).days + 1)
         # 分组后按日均余额升序排列
         column_type = pd.DataFrame({C.AVG_AMT: avg_amt,
                                     C.INST_GROUP: inst_group,
-                                    C.PRODUCT: product,
+                                    C.PRODUCT: product_group,
                                     C.WEIGHT_RATE: weight_rate})
         column_type.sort_values(by=C.AVG_AMT, ascending=False, inplace=True)
         column_type.reset_index(inplace=True)
@@ -340,24 +275,6 @@ class Repo(FundTx):
 
         return raw
 
-    def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
-        """
-        按交易方向分类源数据.
-
-        Args:
-            direction (str): 交易方向.
-
-        Returns:
-            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
-        """
-
-        if self.raw.empty or direction not in ['正回购', '逆回购']:
-            return pd.DataFrame({})
-
-        d = 4 if direction == '正回购' else 1
-
-        return super().daily_data(d)
-
 
 class IBO(FundTx):
 
@@ -402,6 +319,8 @@ class IBO(FundTx):
         # f" and ti.{C.DIRECTION} = " + self.direction + \
 
         self.raw = self._get_raw_data(sql)
+
+        # 拆借业务的原数据融入融出代码与回购相反，这里做一个统一
         if not self.raw.empty:
             self.raw[C.DIRECTION] = self.raw[C.DIRECTION].replace({4: 1, 1: 4})
 
@@ -441,35 +360,8 @@ class IBO(FundTx):
 
         return raw1
 
-    def daily_data_by_direction(self, direction: str) -> pd.DataFrame:
-        """
-        按交易方向分类源数据.
-
-        Args:
-            direction (str): 交易方向.
-
-        Returns:
-            pd.DataFrame: [AS_DT, C.TRADE_AMT, C.INST_DAYS, C.WEIGHT_RATE]
-        """
-
-        if self.raw.empty or direction not in ['同业拆入', '同业拆出']:
-            return pd.DataFrame({})
-
-        d = 4 if direction == '同业拆入' else 1
-
-        return super().daily_data(d)
-
 
 if __name__ == '__main__':
     s_t = datetime.date(2023, 11, 14)
     e_t = datetime.date(2023, 11, 20)
     repo = Repo(s_t, e_t)
-
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        print(type(repo.raw.iloc[0][C.DIRECTION]))
-
-    print(repo.daily_data_by_direction('正回购'))
-    print(repo.daily_data_by_direction('逆回购'))
-
-    # ibo = IBO(s_t, e_t, '同业拆入')
-    # print(ibo.daily_data())

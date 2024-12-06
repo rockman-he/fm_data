@@ -81,7 +81,8 @@ class TimeUtil:
             for month in range(1, current_month + 1):
                 start_date = date(year_num, month, 1)
                 if month == current_month:
-                    end_date = current_date.date() - timedelta(days=1)
+                    # end_date = current_date.date() - timedelta(days=1)
+                    end_date = current_date.date()
                 else:
                     end_date = date(year_num, month + 1, 1) - timedelta(days=1)
 

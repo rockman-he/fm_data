@@ -183,7 +183,7 @@ class Constants:
     INST_DAYS = 'inst_days'
     # 每天利息
     INST_A_DAY = 'inst_a_day'
-    # 分组后的利息
+    # 分组后的利息/套息收入
     INST_GROUP = 'inst_group'
     # 加权利率
     WEIGHT_RATE = 'weight_rate'

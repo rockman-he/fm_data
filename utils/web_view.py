@@ -424,3 +424,16 @@ def main_page_all_profit(df: pd.DataFrame):
     )
 
     return c
+
+
+COL_CHI = {
+    C.R001: 'R001',
+    C.R007: 'R007',
+    C.SHIBOR_ON: 'SHIBOR_ON',
+    C.SHIBOR_1W: 'SHIBOR_1W',
+    C.NAME: '交易对手',
+    C.AVG_AMT: '日均余额（元）',
+    C.INST_GROUP: '利息支出（元）',
+    C.TERM_TYPE: '期限',
+    C.WEIGHT_RATE: '加权利率（%）'
+}

@@ -8,9 +8,10 @@ import pandas as pd
 import streamlit as st
 
 from fund_tx import Repo
-from utils.web_data import FundDataHandler
+from utils.web_data import FundDataHandler, format_output_keep_types
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
+from utils.web_view import COL_CHI
 
 import streamlit_echarts
 from pyecharts.globals import ThemeType
@@ -95,6 +96,8 @@ else:
         height='500px'
     )
 
+    st.expander('详细数据').write(dh['holded'])
+
     st.divider()
     st.markdown("###  交易对手排名")
     st.markdown(" ")
@@ -124,17 +127,13 @@ else:
 
     with st.expander("交易对手明细(全量）"):
 
-        if dh['party_total'].empty is False:
+        if not dh['party_total'].empty:
             # 对输出格式化
-            txn_party_total = FundDataHandler.format_output(dh['party_total'])
+            # txn_party_total = FundDataHandler.format_output(dh['party_total'])
+            txn_party_total = format_output_keep_types(dh['party_total'])
 
         st.dataframe(txn_party_total[[C.NAME, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
-                     column_config={
-                         C.NAME: '交易对手',
-                         C.AVG_AMT: '日均余额（元）',
-                         C.INST_GROUP: '利息支出',
-                         C.WEIGHT_RATE: '加权利率（%）'
-                     })
+                     column_config=COL_CHI)
 
     st.divider()
     st.markdown("###  期限分析")
@@ -148,14 +147,9 @@ else:
     )
 
     with st.expander("期限占比明细"):
-        if dh['term_total'].empty is False:
+        if not dh['term_total'].empty:
             # 对输出格式化
-            txn_term_total = FundDataHandler.format_output(dh['term_total'])
+            txn_term_total = format_output_keep_types(dh['term_total'])
 
         st.dataframe(txn_term_total[[C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
-                     column_config={
-                         C.TERM_TYPE: '期限类别',
-                         C.AVG_AMT: '日均余额（元）',
-                         C.INST_GROUP: '利息支出',
-                         C.WEIGHT_RATE: '加权利率（%）'
-                     })
+                     column_config=COL_CHI)

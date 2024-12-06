@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from fund_tx import IBO
-from utils.web_data import FundDataHandler
+from utils.web_data import FundDataHandler, format_output_keep_types
 from utils.time_util import TimeUtil
 from utils.db_util import Constants as C
 
@@ -16,7 +16,7 @@ import streamlit_echarts
 from pyecharts.globals import ThemeType
 
 from utils.txn_factory import TxFactory
-from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global
+from utils.web_view import fund_tx_header, fund_line_global, line_component, bar_global, pie_global, COL_CHI
 
 # set_page_config必须放在开头，不然会报错
 st.set_page_config(page_title="拆借业务",
@@ -126,15 +126,11 @@ else:
         # 把“合计”行放置到最后一行
         if dh['party_total'].empty is False:
             # 对输出格式化
-            dh['party_total'] = FundDataHandler.format_output(dh['party_total'])
+            # dh['party_total'] = FundDataHandler.format_output(dh['party_total'])
+            txn_party_total = format_output_keep_types(dh['party_total'])
 
-        st.dataframe(dh['party_total'][[C.NAME, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
-                     column_config={
-                         C.NAME: '交易对手',
-                         C.AVG_AMT: '日均余额（元）',
-                         C.INST_GROUP: '利息支出',
-                         C.WEIGHT_RATE: '加权利率（%）'
-                     })
+        st.dataframe(txn_party_total[[C.NAME, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]], use_container_width=True,
+                     column_config=COL_CHI)
 
     st.divider()
     st.markdown("###  期限分析")
@@ -153,13 +149,10 @@ else:
     with st.expander("期限占比明细"):
         if dh['term_total'].empty is False:
             # 对输出格式化
-            dh['term_total'] = FundDataHandler.format_output(dh['term_total'])
+            # dh['term_total'] = FundDataHandler.format_output(dh['term_total'])
+            txn_term_total = format_output_keep_types(dh['term_total'])
+            # print(txn_term_total)
 
-        st.dataframe(dh['term_total'][[C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]],
+        st.dataframe(txn_term_total[[C.TERM_TYPE, C.AVG_AMT, C.INST_GROUP, C.WEIGHT_RATE]],
                      use_container_width=True,
-                     column_config={
-                         C.TERM_TYPE: '期限类别',
-                         C.AVG_AMT: '日均余额（元）',
-                         C.INST_GROUP: '利息支出',
-                         C.WEIGHT_RATE: '加权利率（%）'
-                     })
+                     column_config=COL_CHI)

@@ -69,11 +69,11 @@ if option == '收益测算':
 
         st.write("### 区间收益")
 
-        daily_all_cum = dh.period_yield_all_cum(start_time, end_time)
+        daily_all_cum = dh.daily_yield_all_cum(start_time, end_time)
         daily_all_cum[C.BOND_TYPE] = '全部债券'
-        daily_inst_cum = dh.period_yield_inst_cum(start_time, end_time)
+        daily_inst_cum = dh.daily_yield_inst_cum(start_time, end_time)
         daily_inst_cum[C.BOND_TYPE] = '利率债'
-        daily_credit_cum = dh.period_yield_credit_cum(start_time, end_time)
+        daily_credit_cum = dh.daily_yield_credit_cum(start_time, end_time)
         daily_credit_cum[C.BOND_TYPE] = '信用债'
 
 
