@@ -243,7 +243,7 @@ class Constants:
     YOY = '_yoy'
 
 
-@st.cache_resource
+# @st.cache_resource
 def create_conn(db=Constants.COMP_DBNAME) -> st.connection:
     """
     建立一个数据库对象
