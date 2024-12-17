@@ -351,7 +351,7 @@ class IBO(FundTx):
               f"on ti.{C.COUNTERPARTY} = ba.{C.SHORT_NAME} " \
               f"where ba.{C.NAME} != '';"
 
-        raw2 = get_raw(create_conn(), sql)
+        raw2 = get_raw(self.conn, sql)
         df_merged = raw1.merge(raw2, on=C.COUNTERPARTY, how='left', suffixes=('_raw1', '_raw2'))
 
         raw1[C.SHORT_NAME] = df_merged[C.SHORT_NAME + '_raw2'].combine_first(df_merged[C.SHORT_NAME + '_raw1'])

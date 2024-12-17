@@ -745,6 +745,9 @@ class SecurityTx:
         bond = self.daily_holded_bond(bond_code).copy()
         capital = self.get_capital_gains(bond_code)
 
+        # if bond.empty and capital.empty:
+        #     return pd.DataFrame({})
+
         # 该情况为单日卖空无持仓但存在资本利得的情况
         if bond.empty and (not capital.empty):
             capital = capital.copy()
@@ -758,7 +761,7 @@ class SecurityTx:
 
         # 对于无资本利得的情况，直接赋值0
         if capital.empty:
-            bond.loc[:, C.CAPITAL_GAINS] = 0.0
+            bond[C.CAPITAL_GAINS] = 0.0
         else:
             # 如果当日卖空,则持仓为0
             bond = pd.merge(bond, capital[[C.DATE, C.BOND_CODE, C.MARKET_CODE, C.BOND_NAME, C.CAPITAL_GAINS]],
