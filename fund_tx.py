@@ -32,7 +32,7 @@ class FundTx:
         # self.direction = direction
         self.inst_base = 365
         self.raw = None
-        self.conn = create_conn()
+        # self.conn = create_conn()
 
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
@@ -50,7 +50,7 @@ class FundTx:
             return pd.DataFrame({})
 
         # 从数据库中获取数据
-        raw = get_raw(self.conn, sql)
+        raw = get_raw(create_conn(), sql)
 
         if raw.empty:
             return pd.DataFrame({})
@@ -351,7 +351,7 @@ class IBO(FundTx):
               f"on ti.{C.COUNTERPARTY} = ba.{C.SHORT_NAME} " \
               f"where ba.{C.NAME} != '';"
 
-        raw2 = get_raw(self.conn, sql)
+        raw2 = get_raw(create_conn(), sql)
         df_merged = raw1.merge(raw2, on=C.COUNTERPARTY, how='left', suffixes=('_raw1', '_raw2'))
 
         raw1[C.SHORT_NAME] = df_merged[C.SHORT_NAME + '_raw2'].combine_first(df_merged[C.SHORT_NAME + '_raw1'])

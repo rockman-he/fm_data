@@ -27,7 +27,7 @@ class MarketUtil:
         self.start_time = None
         self.end_time = None
         self.raw = pd.DataFrame({})
-        self.conn = create_conn()
+        # self.conn = create_conn()
 
     def get_irt(self, start_time: datetime.date, end_time: datetime.date) -> pd.DataFrame:
 
@@ -53,7 +53,7 @@ class MarketUtil:
 
         sql = "select * from fm_da.market_irt mi"
 
-        self.raw = get_raw(self.conn, sql)
+        self.raw = get_raw(create_conn(), sql)
 
         full_range = pd.date_range(start=start_time, end=end_time)
 

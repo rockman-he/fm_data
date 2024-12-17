@@ -21,8 +21,8 @@ class SecurityTx:
             交易开始统计时间
         end_time : datetime.date
             交易截至统计时间（含）
-        conn : sqlite3.Connection
-            数据库连接对象
+        # conn : sqlite3.Connection
+        #     数据库连接对象
         secondary_trades : pandas.DataFrame
             二级交易记录
         primary_trades : pandas.DataFrame
@@ -54,7 +54,7 @@ class SecurityTx:
 
         self.start_time = start_time
         self.end_time = end_time
-        self.conn = create_conn()
+        # self.conn = create_conn()
 
         self.secondary_trades = self._sum_secondary_trades()
         self.holded_bonds_info = self._holded_bonds_info_expand()
@@ -106,7 +106,7 @@ class SecurityTx:
             return pd.DataFrame({})
 
         # 从数据库中获取数据
-        raw = get_raw(self.conn, sql)
+        raw = get_raw(create_conn(), sql)
 
         return raw
 
@@ -170,7 +170,7 @@ class SecurityTx:
     #     """
     #     时间区间持有过的债券信息，不包括早期的收益凭证。
     #     Returns:
-    #         pd.DataFrame: [C.BOND_NAME, C.BOND_FULL_NAME, C.BOND_CODE, C.BOND_TYPE_NUM, C.BOND_TYPE, C.ISSUE_DATE},
+    #         pd.DataFrame: [C.BOND_NAME, C.BOND_FULL_NAME, C.BOND_CODE, C.BOND_TYPE_NUM, C.BOND_TYPE, C.ISSUE_DATE,
     #         C.MATURITY, C.COUPON_RATE_CURRENT, C.COUPON_RATE_ISSUE, C.ISSUE_AMT, C.ISSUE_PRICE, C.ISSUE_ORG,
     #         C.BOND_TERM, C.MARKET_CODE]
     #
