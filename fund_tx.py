@@ -34,6 +34,8 @@ class FundTx:
         self.raw = None
         # self.conn = create_conn()
 
+        # 测试
+
     def _get_raw_data(self, sql: str) -> pd.DataFrame:
         """
         从数据库获取原始数据.
