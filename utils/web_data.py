@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Union
 
 import pandas as pd
+import calendar
 from pandas import DataFrame
 
 from bond_tx import SecurityTx, BondTx, CDTx
@@ -151,16 +152,16 @@ class FundDataHandler:
         raw = self.tx.raw_by_direction(self.d)
         workdays = (self.tx.end_time - self.tx.start_time).days + 1
 
-        insts = raw[C.INST_DAYS].sum()
-        avg_amt = raw[C.PRODUCT].sum() / workdays
-        products = raw[C.PRODUCT].sum()
+        insts = raw[C.INST_DAYS].sum() if not raw.empty else 0
+        avg_amt = raw[C.PRODUCT].sum() / workdays if not raw.empty else 0
+        products = raw[C.PRODUCT].sum() if not raw.empty else 0
 
         rate = insts * self.tx.inst_base / products * 100 if products != 0 else 0
 
         return {
-            'avg_amt': avg_amt,
-            'insts': insts,
-            'rate': rate
+            C.AVG_AMT: avg_amt,
+            C.INST_DAYS: insts,
+            C.WEIGHT_RATE: rate
         }
 
     def add_total(self, raw: pd.DataFrame, flag: int = 1) -> pd.DataFrame:
@@ -350,25 +351,32 @@ class FundDataHandler:
 
             # 生成一个包含每个月最后一天的日期索引的DataFrame
             dates = pd.to_datetime([end for _, end in months])
-            df = pd.DataFrame(index=dates, columns=[C.TX_TYPE, C.AVG_AMT, C.WORK_DAYS, C.INST_DAYS,
+            df = pd.DataFrame(index=dates, columns=[C.TX_TYPE, C.AVG_AMT, C.INST_DAYS,
                                                     C.INST_GROUP, C.WEIGHT_RATE, C.RATE])
 
             df[C.TX_TYPE] = ''
-            df[[C.AVG_AMT, C.WORK_DAYS, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE, C.RATE]] = 0
+            df[[C.AVG_AMT, C.INST_DAYS, C.INST_GROUP, C.WEIGHT_RATE, C.RATE]] = 0
             df.index.name = C.DATE
             # print(df)
 
             return df
 
-        dh.rename(columns={C.TRADE_AMT: C.AVG_AMT}, inplace=True)
+        # dh.rename(columns={C.TRADE_AMT: C.AVG_AMT}, inplace=True)
+        # dh[C.AVG_AMT] = dh[C.TRADE_AMT]
         dh.set_index(C.AS_DT, inplace=True)
 
         # 按月末进行汇总
         dh_monthly = dh.resample('ME').sum()
         workdays = dh_monthly.index.days_in_month
 
+        # print(dh_monthly)
+
         # 计算月均余额
-        dh_monthly[C.AVG_AMT] = dh_monthly[C.AVG_AMT] / workdays
+        # dh_monthly[C.AVG_AMT] = dh_monthly[C.AVG_AMT] / workdays
+
+        dh_monthly[C.AVG_AMT] = dh_monthly[C.TRADE_AMT] / workdays
+
+        # print(dh_monthly)
         # 计算月均加权利率
         dh_monthly[C.WEIGHT_RATE] = (dh_monthly[C.INST_DAYS] * inst_base / workdays /
                                      dh_monthly[C.AVG_AMT]) * 100
@@ -389,15 +397,20 @@ class FundDataHandler:
         if last_row.name.year == current_date.year and last_row.name.month == current_date.month:
             # Calculate the number of days from the start of the month to the previous day
             start_of_month = datetime(current_date.year, current_date.month, 1)
+            # month_days = calendar.monthrange(current_date.year, current_date.month)[1]
 
             # 重新按实际统计天数计算相关列
             # 计算日均余额
+            # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            #     print(dh_monthly)
+
             days_interval = ((current_date - timedelta(days=1)).day - start_of_month.day + 1)
             avg_amt_loc = dh_monthly.columns.get_loc(C.AVG_AMT)
             weight_rate_loc = dh_monthly.columns.get_loc(C.WEIGHT_RATE)
             inst_group_loc = dh_monthly.columns.get_loc(C.INST_GROUP)
+            trade_amt_loc = dh_monthly.columns.get_loc(C.TRADE_AMT)
 
-            dh_monthly.iloc[-1, avg_amt_loc] = dh_monthly.iloc[-1, avg_amt_loc] / days_interval
+            dh_monthly.iloc[-1, avg_amt_loc] = dh_monthly.iloc[-1, trade_amt_loc] / days_interval
 
             # 计算加权利率
             if dh_monthly.iloc[-1, avg_amt_loc] != 0:
@@ -552,9 +565,12 @@ class SecurityDataHandler:
             months = TimeUtil.get_months_feday(start_time.year)
 
             # 生成一个包含每个月最后一天的日期索引的DataFrame
-            dates_index = pd.to_datetime([end for _, end in months])
+            dates = pd.to_datetime([end for _, end in months])
 
-            df = pd.DataFrame(index=dates_index, columns=[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE])
+            df = pd.DataFrame(index=dates, columns=[C.TX_TYPE, C.AVG_AMT, C.INST_DAYS,
+                                                    C.CAPITAL_GAINS, C.WEIGHT_RATE])
+
+            df[C.TX_TYPE] = ''
             df[[C.AVG_AMT, C.INST_DAYS, C.CAPITAL_GAINS, C.WEIGHT_RATE]] = 0
 
             df.index.name = C.DATE
@@ -571,13 +587,13 @@ class SecurityDataHandler:
         dh_monthly = dh_monthly.reindex(dh_monthly.index.union(month_end_dates).sort_values(), fill_value=0)
 
         # 计算月均持仓面额
-        dh_monthly[C.AVG_AMT] = dh_monthly[C.HOLD_AMT] / dh_monthly.index.days_in_month
+        dh_monthly[C.AVG_AMT] = dh_monthly[C.CAPITAL_OCCUPY] / dh_monthly.index.days_in_month
 
         # 计算月均加权收益率
         dh_monthly[C.WEIGHT_RATE] = ((dh_monthly[C.INST_A_DAY] * 365 +
                                       dh_monthly[C.CAPITAL_GAINS] * dh_monthly.index.days_in_month) /
                                      dh_monthly[C.CAPITAL_OCCUPY]) * 100
-
+        # todo 继续完善
         # 无收益的情况，直接置为0
         dh_monthly.loc[(dh_monthly[C.INST_A_DAY] + dh_monthly[C.CAPITAL_GAINS]) == 0, C.WEIGHT_RATE] = 0
 
@@ -591,11 +607,13 @@ class SecurityDataHandler:
             days_interval = ((current_date - timedelta(days=1)).day - start_of_month.day + 1)
 
             # 重新按实际统计天数计算日均余额列
-            avg_amt = dh_monthly.columns.get_loc(C.AVG_AMT)
-            dh_monthly.iloc[-1, avg_amt] = dh_monthly.iloc[-1, avg_amt] / days_interval
+            avg_amt_loc = dh_monthly.columns.get_loc(C.AVG_AMT)
+            hold_amt_loc = dh_monthly.columns.get_loc(C.HOLD_AMT)
+
+            dh_monthly.iloc[-1, avg_amt_loc] = dh_monthly.iloc[-1, hold_amt_loc] / days_interval
 
             # 如果日均余额非0， 还要更新加权利率
-            if dh_monthly.iloc[-1, avg_amt] != 0:
+            if dh_monthly.iloc[-1, avg_amt_loc] != 0:
                 dh_monthly.iloc[-1, dh_monthly.columns.get_loc(C.WEIGHT_RATE)] = \
                     ((dh_monthly.iloc[-1][C.INST_A_DAY] * 365 + dh_monthly.iloc[-1][C.CAPITAL_GAINS] * days_interval) /
                      dh_monthly.iloc[-1][C.CAPITAL_OCCUPY]) * 100
@@ -1131,10 +1149,11 @@ class OverviewDataHandler:
         # 计算合计值
         total = tx_hl.get_total()
         work_days = (end_time - start_time).days + 1
-        total['insts_other'] = 0
+        total[C.INST_OTHER] = 0
 
         if tx_type in [C.REPO, C.IBO]:
-            total['insts_other'] = total['avg_amt'] * (mark_rate - total['rate']) * work_days / txn.inst_base / 100
+            total[C.INST_OTHER] = (total[C.AVG_AMT] *
+                                   (mark_rate - total[C.WEIGHT_RATE]) * work_days / txn.inst_base / 100)
         self.tx_total_dict[tx_type + str(year)] = total
 
         return [tx_data, total]
@@ -1170,7 +1189,7 @@ class OverviewDataHandler:
         else:
             return pd.DataFrame({})
 
-        txn_data = SecurityDataHandler(txn_type(start_time, end_time)).monthly_summary()
+        txn_data = SecurityDataHandler(TxFactory(txn_type).create_txn(start_time, end_time)).monthly_summary()
         txn_data[C.TX_TYPE] = tx_type
 
         # txn_data.index.name = C.DATE
